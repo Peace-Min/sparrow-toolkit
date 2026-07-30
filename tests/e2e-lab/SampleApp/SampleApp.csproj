@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- E2E mini-project with PLANTED Track C defects. LangVersion 7.3 enforces that the
+       guide fix patterns are valid C# 7.3 (no using-declarations, no switch-expressions,
+       no nullable reference types). Files compile as-is (flawed but legal). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <OutputType>Library</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SampleApp</AssemblyName>
+    <RootNamespace>SampleApp</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowXlsExport</AssemblyName>
+    <RootNamespace>SparrowXlsExport</RootNamespace>
+    <!-- NPOI 2.8.0 (via Core) transitively pulls System.Security.Cryptography.Xml 8.0.2 (NU1903 advisory).
+         Acceptable: this is an offline tool reading trusted internal .xls files only, never network-facing. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Parsing logic lives in the shared Core library (NPOI comes transitively from there). -->
+    <ProjectReference Include="..\SparrowXlsExport.Core\SparrowXlsExport.Core.csproj" />
+  </ItemGroup>
+
+  <!-- FixtureGen is a separate test-only project nested in a subfolder; exclude its sources from this build. -->
+  <ItemGroup>
+    <Compile Remove="FixtureGen\**\*.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,42 @@
+# --- .NET build outputs (commit source only: csproj/.cs/.ps1) ---
+tools/**/bin/
+tools/**/obj/
+# publish/ = 폐쇄망 반입용 self-contained/framework-dependent 발행 산출물(publish-airgap.ps1). 머신마다 생성, 커밋 금지.
+tools/**/publish/
+SparrowRunner.Gui/**/bin/
+SparrowRunner.Gui/**/obj/
+SparrowRunner.Gui/**/publish/
+tests/**/bin/
+tests/**/obj/
+
+# --- ad-hoc / generated Sparrow artifacts (never commit) ---
+# tests/e2e-lab 아래 명시적 소형 fixture .xls만 커밋. 나머지 임시/생성물은 무시.
+*.items/
+fixture.xls
+issues_*.xls
+*.log
+
+# --- 진단 로그(테스트 산출) ---
+# tests\_logs\uia-*  : UIA 하네스의 result.log + UIA 트리 덤프 + 앱 세션 로그/Track C 리포트
+# tests\_logs\validate-*.log : validate.ps1 트랜스크립트
+# 머신·실행마다 새로 생기고 각자 최신 N개만 보관한다. 커밋 대상 아님.
+tests/_logs/
+
+# --- restored/vendored binaries ---
+*.dll
+
+# --- IDE / misc ---
+.vs/
+out/
+tmp/
+TestResults/
+__pycache__/
+*.pyc
+# 파수(Fasoo) Sparrow 공식 Rule 원문 — 제3자 독점 문서라 레포에 포함하지 않는다.
+# 각자 자신의 Sparrow에서 반입해 로컬로만 사용.
+references/sparrow-official-rules/
+
+# --- 체커 가이드(사용자 로컬 자산) ---
+# Track C 익스포터는 선행 문서를 요구하지 않는다. 체커별 가이드는 각자 필요한 만큼
+# 로컬로 쌓는 자산이라 레포가 배포하지 않는다.
+references/checkers/

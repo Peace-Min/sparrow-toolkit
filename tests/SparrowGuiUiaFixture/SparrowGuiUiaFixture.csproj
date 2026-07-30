@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Test-only generator for the GUI UIA harness (tests\gui-uia-tests.ps1). Emits a tiny real BIFF (.xls)
+       with THREE checker keys, one of which has TWO findings (so the harness can verify "all item md" behavior).
+       NEVER committed; generated fresh at test time. Same NPOI as the parser. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>GuiUiaFixture</AssemblyName>
+    <RootNamespace>GuiUiaFixture</RootNamespace>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.8.0" />
+  </ItemGroup>
+
+</Project>

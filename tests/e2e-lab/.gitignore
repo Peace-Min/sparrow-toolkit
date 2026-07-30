@@ -1,0 +1,4 @@
+# E2E run artifacts and build outputs — never stage these.
+_out/
+bin/
+obj/

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Test-only generator for the exhaustive Sparrow xls coverage measurement. Reads the real MyApp issues
+       .xls with NPOI, extracts the flagged code of every Track A/B finding, wraps each into a parseable
+       snippet (Roslyn-validated), and writes per-checker .cs batches + a manifest. NOT committed binaries;
+       built on demand by tests\sparrow-exhaustive-xls-test.ps1. Self-skips when the xls is absent. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowExhaustiveXls</AssemblyName>
+    <RootNamespace>SparrowExhaustiveXls</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NPOI: read real BIFF .xls (same version the SparrowXlsExport tool uses). -->
+    <PackageReference Include="NPOI" Version="2.8.0" />
+    <!-- Roslyn syntax APIs: same version the tools use, so "parses here" == "parses in the tool". -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+
+</Project>

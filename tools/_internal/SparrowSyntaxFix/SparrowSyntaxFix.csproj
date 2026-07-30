@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowSyntaxFix</AssemblyName>
+    <RootNamespace>SparrowSyntaxFix</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <!-- Deterministic + air-gapped: Roslyn only. Pin an exact 4.x so the offline restore is reproducible. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Roslyn syntax APIs only. The tool PARSES source text; it never loads MSBuild projects (the target
+         MyApp repo is legacy non-SDK, so a project load would fail). No other NuGet dependency by design. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+
+  <!-- FixtureTests is a nested test-only project (its own csproj); exclude its sources from this build. -->
+  <ItemGroup>
+    <Compile Remove="FixtureTests\**\*.cs" />
+  </ItemGroup>
+
+</Project>

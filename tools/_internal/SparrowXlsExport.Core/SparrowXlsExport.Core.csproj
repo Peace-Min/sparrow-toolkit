@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowXlsExport.Core</AssemblyName>
+    <RootNamespace>SparrowXlsExport.Core</RootNamespace>
+    <!-- Accept NPOI's OSMF license non-interactively so restore never warns/prompts (verified needed). -->
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+    <!-- NPOI 2.8.0 transitively pulls System.Security.Cryptography.Xml 8.0.2 (NU1903 advisory). Acceptable:
+         this is an offline tool reading trusted internal .xls files only, never network-facing. -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NPOI: pure-managed BIFF/OOXML reader; reads real .xls (OLE2) without Excel/COM (air-gap safe). -->
+    <PackageReference Include="NPOI" Version="2.8.0" />
+  </ItemGroup>
+
+  <!-- CoreTests is a separate test-only console project nested in a subfolder; exclude its sources here. -->
+  <ItemGroup>
+    <Compile Remove="CoreTests\**\*.cs" />
+  </ItemGroup>
+
+</Project>

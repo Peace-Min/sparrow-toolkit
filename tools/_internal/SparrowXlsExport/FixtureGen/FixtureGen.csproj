@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Test-only generator: writes a tiny real BIFF (.xls) fixture at test time. NEVER committed. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>FixtureGen</AssemblyName>
+    <RootNamespace>FixtureGen</RootNamespace>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.8.0" />
+  </ItemGroup>
+
+</Project>

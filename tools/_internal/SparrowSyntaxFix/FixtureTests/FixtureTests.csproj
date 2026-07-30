@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Test-only harness: asserts the exact real-world before->after cases from Sparrow output. NEVER
+       committed as a build output. It compiles the REAL rewriter sources (below) into itself, so it tests
+       the shipping code directly with no separate library and no InternalsVisibleTo. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>FixtureTests</AssemblyName>
+    <RootNamespace>SparrowSyntaxFix.FixtureTests</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\RewriteEngine.cs" Link="engine\RewriteEngine.cs" />
+    <Compile Include="..\NullCastRewriter.cs" Link="engine\NullCastRewriter.cs" />
+    <Compile Include="..\NullVarRewriter.cs" Link="engine\NullVarRewriter.cs" />
+    <Compile Include="..\VarRewriteHelpers.cs" Link="engine\VarRewriteHelpers.cs" />
+    <Compile Include="..\ObjectVarRewriter.cs" Link="engine\ObjectVarRewriter.cs" />
+    <Compile Include="..\ObjectInitializerRewriter.cs" Link="engine\ObjectInitializerRewriter.cs" />
+    <Compile Include="..\ArrayVarRewriter.cs" Link="engine\ArrayVarRewriter.cs" />
+    <Compile Include="..\ForeachCastRewriter.cs" Link="engine\ForeachCastRewriter.cs" />
+    <Compile Include="..\ObviousVarRewriter.cs" Link="engine\ObviousVarRewriter.cs" />
+    <Compile Include="..\LocalConstRewriter.cs" Link="engine\LocalConstRewriter.cs" />
+    <Compile Include="..\ParensRewriter.cs" Link="engine\ParensRewriter.cs" />
+    <Compile Include="..\ForVarRewriter.cs" Link="engine\ForVarRewriter.cs" />
+    <Compile Include="..\FieldSplitRewriter.cs" Link="engine\FieldSplitRewriter.cs" />
+    <Compile Include="..\EmptyStmtRewriter.cs" Link="engine\EmptyStmtRewriter.cs" />
+    <Compile Include="..\ForHoistRewriter.cs" Link="engine\ForHoistRewriter.cs" />
+  </ItemGroup>
+
+</Project>

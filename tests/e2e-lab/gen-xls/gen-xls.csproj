@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- E2E xls generator: writes real BIFF (.xls) Sparrow-style workbooks (sheet 'issues')
+       with the well-known Sparrow columns the parser keys on. Same NPOI as the parser. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>GenXls</AssemblyName>
+    <RootNamespace>GenXls</RootNamespace>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NPOI" Version="2.8.0" />
+  </ItemGroup>
+
+</Project>

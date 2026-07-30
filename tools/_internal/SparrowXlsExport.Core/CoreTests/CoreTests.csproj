@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>CoreTests</AssemblyName>
+    <RootNamespace>SparrowXlsExport.Core.Tests</RootNamespace>
+    <!-- NPOI (via Core) transitively pulls System.Security.Cryptography.Xml 8.0.2 (NU1903 advisory). -->
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exercises the shared parsing/prepare library in-process. -->
+    <ProjectReference Include="..\SparrowXlsExport.Core.csproj" />
+  </ItemGroup>
+
+</Project>
