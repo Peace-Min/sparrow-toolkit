@@ -13,9 +13,12 @@ Track A는 Sparrow 코드 규칙 계열을 LLM 없이 자동수정하는 경로�
 
 ## 대상 체커
 
+현행 규칙 키는 **14개**다. 아래 표가 전부이며, 하나라도 빠지면 이 문서가 낡은 것이다
+(원천은 `tools/_internal/SparrowSyntaxFix/Program.cs` 의 `RuleOrder` 배열).
+
 | Sparrow 체커 | Track A 규칙 | 대표 변경 |
 |---|---|---|
-| `PRACTICE.OBJECT_INSTANTIATION.NOT_USED_IMPLICIT_TYPING` | `objectvar-safe` | `Foo x = new Foo();` -> `var x = new Foo();` |
+| `PRACTICE.OBJECT_INSTANTIATION.NOT_USED_IMPLICIT_TYPING` | `objectvar-safe`, `objectvar-narrowing` | `Foo x = new Foo();` -> `var x = new Foo();` / (narrowing) 상위 타입·인터페이스 선언을 실제 생성 타입 `var` 로 축소 — **검토필요** |
 | `PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING` | `obviousvar`, `nullvar`, `localconst` | `string s = "A";` -> `var s = "A";` |
 | `PRACTICE.LOOP_VARIABLE.NOT_USED_IMPLICIT_TYPING` | `forvar`, `foreachcast` | `foreach (XmlNode n in xs)` -> `foreach (var n in Enumerable.Cast<XmlNode>(xs))` |
 | `PRACTICE.OBJECT_INITIALIZATION.NOT_USED_INITIALIZER` | `objectinitializer` | 생성 직후 연속 대입을 object initializer로 통합 |
@@ -26,7 +29,7 @@ Track A는 Sparrow 코드 규칙 계열을 LLM 없이 자동수정하는 경로�
 ## 실행
 
 ```powershell
-.\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1
 ```
 
 또는 GUI:
@@ -36,6 +39,10 @@ tools\Run-SparrowRunnerGui.cmd
 ```
 
 일반 사용자는 위처럼 실행한 뒤 화면/프롬프트에서 솔루션 또는 폴더 경로와 커밋 여부를 선택한다.
+
+> **자동화/CI 에서는 `-Rules` 를 반드시 명시한다.** 생략하면 러너가 opt-in 규칙마다 Y/N 을 되묻고,
+> 비대화형 stdin 에서는 그 규칙들이 조용히 전부 꺼진다. `-LogDir` 를 줄 때는 **폴더를 미리 만들어 둔다**
+> (러너가 만들지 않는다). 자세한 건 [../docs/usage.md](../docs/usage.md#cli-자동화-주의사항).
 
 ## 검증
 

@@ -32,7 +32,9 @@ Assert (Test-Path -LiteralPath $genProj) "gen-xls.csproj 존재: $genProj"
 $dotnetCmd = Get-Command dotnet -ErrorAction SilentlyContinue
 if (-not $dotnetCmd) {
     Write-Host "  SKIP  dotnet SDK 없음 — G2 시나리오 검사를 건너뜁니다."
-    if ($script:fails -eq 0) { exit 0 } else { exit 1 }
+    # 스킵 신호는 위 Test-Path 단정이 전부 통과했을 때만 올린다. 하나라도 깨졌으면 그건 스킵이 아니라
+    # 진짜 실패이므로 exit 1 로만 나가야 한다(스킵 마커가 붙으면 부모가 실패를 스킵으로 삼킨다).
+    if ($script:fails -eq 0) { $global:SparrowTestSkip = "dotnet SDK 없음"; exit 0 } else { exit 1 }
 }
 
 $work = Join-Path ([System.IO.Path]::GetTempPath()) ('g2-gate-' + [System.IO.Path]::GetRandomFileName())

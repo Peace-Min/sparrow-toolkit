@@ -2,20 +2,23 @@
 <#
     Run-SparrowSyntaxFix.ps1 — Track A 2단계 원콜 러너.
     Track A 체커를 자작 Roslyn 툴 SparrowSyntaxFix로 결정론 처리:
-      - nullvar              : `<타입> x = null;` / `<타입> x;` -> `var x = (<타입>)null;`
+      - nullvar              : `<타입> x = null;` / `<타입> x;` -> `var x = (<타입>)null;`(커밋명 review-needed)
       - parens               : `a && b` 등의 비교/산술 피연산자 괄호
       - objectvar-safe       : `Foo x = new Foo()` -> `var x = new Foo()`
-      - foreachcast          : `foreach (T x in xs)` -> `foreach (var x in Enumerable.Cast<T>(xs))`
+      - foreachcast          : `foreach (T x in xs)` -> `foreach (var x in Enumerable.Cast<T>(xs))`(커밋명 review-needed)
       - obviousvar           : literal/Convert/cast initializer -> var
       - objectvar-narrowing  : 인터페이스/기반타입 var 변환(커밋명 review-needed)
       - localconst           : 지역 const -> var(커밋명 review-needed)
-      - objectinitializer    : 생성 직후 연속 property 대입 -> object initializer + var
+      - objectinitializer    : 생성 직후 연속 property 대입 -> object initializer + var(커밋명 review-needed)
       - arrayvar-safe        : T[] a = new T[] { ... } -> T[] a = { ... }
       - arrayvar-narrowing   : 배열 정적 타입 축소 var 변환(커밋명 review-needed)
-      - forvar               : for(int i=0; ...) -> for(var i=0; ...) (단일 선언자·명백 초기값; opt-in)
-      - fieldsplit           : 다중 선언자 필드 -> 줄마다 하나(필드 한정; opt-in)
-      - emptystmt            : 잉여 빈문장(; ;) 제거(for(;;)/label 등 의미상 필요분 제외; opt-in)
-      - forhoist             : 다중 선언자 for 초기화절 분해 — 비루프 선언자를 for 앞으로 hoist(for는 단일 선언자 유지; opt-in)
+      - forvar               : for(int i=0; ...) -> for(var i=0; ...) (단일 선언자·명백 초기값; opt-in, 커밋명 review-needed)
+      - fieldsplit           : 다중 선언자 필드 -> 줄마다 하나(필드 한정; opt-in, 커밋명 review-needed)
+      - emptystmt            : 잉여 빈문장(; ;) 제거(for(;;)/label 등 의미상 필요분 제외; opt-in, 커밋명 review-needed)
+      - forhoist             : 다중 선언자 for 초기화절 분해 — 비루프 선언자를 for 앞으로 hoist(for는 단일 선언자 유지; opt-in, 커밋명 review-needed)
+      ※ review-needed 단일 진실 = SparrowSyntaxFix\README.md 규칙 표의 'Commit policy' 열. 아래 $labels 와
+        GUI 라벨/검토필요 카운트는 그 표를 따라간다(표를 고치면 세 곳을 함께 고칠 것).
+      ※ nullcast 는 nullvar 의 legacy alias 다(같은 rewriter). -Rules 에 둘 다 줘도 1회로 접는다.
     원샷 UX: 솔루션 경로만 주면 동작(내부에서 exe 확보 -> 규칙별 실행 -> 규칙별 커밋).
 
     사용(원큐): 그냥 실행 -> 솔루션 경로 -> 검토필요 규칙 포함 여부(Y/N) -> 커밋 여부(Y/N)를 물어봄.
@@ -30,8 +33,10 @@
       .\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -Commit -VerifyCmd '"C:\...\msbuild.exe" ...\MyApp.sln /t:Build'  # 규칙별 커밋 전 컴파일 게이트(실패 규칙 revert)
 
     폐쇄망 참고: 이 툴은 Roslyn을 품은 컴파일 exe라, 대상 PC에 exe가 있어야 합니다. 러너는
-    (1) -ExePath  (2) 스크립트 옆 publish\SparrowSyntaxFix.exe  (3) bin\Release\net8.0\SparrowSyntaxFix.dll
-    (4) 없으면 `dotnet build`(패키지 복원 가능할 때)  순으로 확보합니다. 인터넷 없는 PC는 (1)/(2)로 반입 exe를 주세요.
+    (1) -ExePath  (2) 스크립트 옆 publish\SparrowSyntaxFix.exe  (3) csproj + SDK 가 있으면 '항상' 증분 `dotnet build`
+    (4) 그래도 없으면(빌드 실패/SDK 없음) 기존 bin\Release\net8.0\SparrowSyntaxFix.dll 폴백  순으로 확보합니다.
+    빌드가 dll 폴백보다 '먼저'인 이유: 오래된 bin dll을 그대로 쓰면 소스를 고쳐도 옛 규칙이 돌아
+    "안 고쳐졌다"처럼 보이는 사고가 실제로 있었습니다. 인터넷 없는 PC는 (1)/(2)로 반입 exe를 주세요.
 #>
 param(
     [string]$Solution,
@@ -88,8 +93,13 @@ if ($Solution) { $Solution = $Solution.Trim().Trim('"').Trim("'").Trim() }
 if (-not $Solution) { throw "경로가 비었습니다. 솔루션(.sln) 또는 소스 폴더 경로가 필요합니다." }
 
 # 규칙 -> 커밋 라벨 (검수 가능한 단위로 규칙별 커밋)
+#
+# 라벨이 '검토필요:' 로 시작하면 커밋 접두가 'sparrow(A)! ' 가 된다(아래 커밋 단계). 그래서 이 표의
+# '검토필요:' 유무 = SparrowSyntaxFix\README.md 규칙 표의 review-needed 여부와 반드시 일치해야 한다.
+# (어긋나면 "검토필요 커밋만 revert" 작업에서 위험 규칙 커밋이 통째로 누락된다 — 실제로 forvar/fieldsplit/
+#  emptystmt 가 그렇게 빠져 있었다.) 키는 canonical 규칙명만 쓴다: nullcast 는 nullvar 로 정규화되어
+# 여기까지 오지 않는다.
 $labels = [ordered]@{
-    nullcast              = '검토필요: 명시 지역변수 typed null 초기화 (SparrowSyntaxFix)'
     nullvar               = '검토필요: 명시 지역변수 typed null 초기화 (SparrowSyntaxFix)'
     parens                = '괄호 명확화 일괄 (&&/|| 피연산자) (SparrowSyntaxFix)'
     'objectvar-safe'      = '객체 생성 명시 타입 var 변환 일괄 (SparrowSyntaxFix)'
@@ -100,9 +110,9 @@ $labels = [ordered]@{
     objectinitializer     = '검토필요: 연속 대입 object initializer 통합 (SparrowSyntaxFix)'
     'arrayvar-safe'       = '배열 선언 문법 간소화 일괄 (SparrowSyntaxFix)'
     'arrayvar-narrowing'  = '검토필요: 배열 정적 타입 축소 var 변환 (SparrowSyntaxFix)'
-    forvar                = 'for 초기화절 명시 타입 var 변환 (SparrowSyntaxFix)'
-    fieldsplit            = '다중 선언자 필드 줄분리 (SparrowSyntaxFix)'
-    emptystmt             = '잉여 빈문장(; ;) 제거 (SparrowSyntaxFix)'
+    forvar                = '검토필요: for 초기화절 명시 타입 var 변환 (SparrowSyntaxFix)'
+    fieldsplit            = '검토필요: 다중 선언자 필드 줄분리 (SparrowSyntaxFix)'
+    emptystmt             = '검토필요: 잉여 빈문장(; ;) 제거 (SparrowSyntaxFix)'
     forhoist              = '검토필요: 다중 선언자 for 초기화절 hoist 분해 (SparrowSyntaxFix)'
 }
 
@@ -131,12 +141,31 @@ if (-not $rulesExplicit -and [Environment]::UserInteractive) {
     }
 }
 
-$canonicalRules = @('nullvar', 'nullcast', 'parens', 'objectvar-safe', 'foreachcast', 'obviousvar', 'objectvar-narrowing', 'localconst', 'objectinitializer', 'arrayvar-safe', 'arrayvar-narrowing', 'forvar', 'fieldsplit', 'emptystmt', 'forhoist')
+# 허용 입력 = canonical 규칙 14종 + legacy alias. alias 는 엔진(Program.cs TryParseRules)과 동일하게
+# canonical 로 접는다: nullcast 와 nullvar 는 같은 rewriter(SyntaxRule.NullVar)라, 둘 다 주면 같은 변환을
+# 두 번 돌려 '동일 메시지 커밋 2개'가 생겼다. 정규화 후 첫 등장만 남겨 1회로 접는다(사용자가 준 순서는 유지 —
+# 규칙 실행/커밋 순서가 곧 롤백 단위 순서이므로 임의로 재정렬하지 않는다).
+$ruleAliases = @{ nullcast = 'nullvar' }
+$canonicalRules = @('nullvar', 'parens', 'objectvar-safe', 'foreachcast', 'obviousvar', 'objectvar-narrowing', 'localconst', 'objectinitializer', 'arrayvar-safe', 'arrayvar-narrowing', 'forvar', 'fieldsplit', 'emptystmt', 'forhoist')
+$acceptedRules = @($canonicalRules + $ruleAliases.Keys)
 $Rules = @($Rules | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$invalidRules = @($Rules | Where-Object { $canonicalRules -notcontains $_ })
+$invalidRules = @($Rules | Where-Object { $acceptedRules -notcontains $_ })
 if ($invalidRules.Count -gt 0) {
-    throw "지원하지 않는 규칙: $($invalidRules -join ', ') / 허용: $($canonicalRules -join ', ')"
+    throw "지원하지 않는 규칙: $($invalidRules -join ', ') / 허용: $($acceptedRules -join ', ')"
 }
+$normalizedRules = New-Object System.Collections.Generic.List[string]
+$foldedAliases = @()
+foreach ($r in $Rules) {
+    # 엔진(Program.cs)과 같은 판정: 소문자로 접고 alias 를 canonical 로 바꾼다.
+    $c = if ($ruleAliases.ContainsKey($r)) { $ruleAliases[$r] } else { $r.ToLowerInvariant() }
+    if ($c -ne $r) { $foldedAliases += ("{0} -> {1}" -f $r, $c) }
+    if (-not $normalizedRules.Contains($c)) { [void]$normalizedRules.Add($c) }
+}
+if ($foldedAliases.Count -gt 0) { Write-Host ("규칙 alias 정규화: {0}" -f ($foldedAliases -join ', ')) }
+if ($normalizedRules.Count -lt $Rules.Count) {
+    Write-Host ("규칙 중복 제거: {0}개 지정 -> {1}개 실행 ({2})" -f $Rules.Count, $normalizedRules.Count, ($normalizedRules -join ','))
+}
+$Rules = @($normalizedRules.ToArray())
 
 # 0) preflight
 if (-not (Test-Path -LiteralPath $Solution)) { throw "솔루션/경로 없음: $Solution" }

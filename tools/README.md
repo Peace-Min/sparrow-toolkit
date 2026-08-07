@@ -10,7 +10,8 @@ Run-SparrowRunnerGui.cmd
 
 - `Run-SparrowRunnerGui.cmd`: **[코드 자동수정 (C#)]** ([코드 규칙] · [주석·레이아웃])과 **[XLS 분리 (모든 언어)]** 를 한 화면에서 실행하는 권장 진입점입니다. [XLS 분리]는 Sparrow 결과 XLS 하나만 받아 검출 전건을 체커 키 폴더별 항목 md(`<체커키>\{ID}_{파일명}_{라인}.md`)로 분리합니다. 인덱스/요약 파일은 만들지 않으며, 준비해야 할 선행 파일도 없습니다.
   - 화면 명칭 ↔ 내부 트랙: **[코드 규칙] = Track A · [주석·레이아웃] = Track B · [XLS 분리] = Track C**(트랙은 내부 명칭이라 화면에는 안 나옵니다).
-  - **GUI 는 파일만 고치고 커밋하지 않습니다**(러너에 `-NoCommit` 고정). 실행 후 `N개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.` 안내가 나오며, 커밋은 사용자가 직접 합니다. 자동 커밋(`-Commit`)·`-DryRun`·`-IncludeGenerated`·`-VerifyCmd` 는 아래 CLI 러너 옵션으로 남아 있습니다.
+  - **커밋 여부는 화면의 [규칙별 커밋 생성] 체크박스가 정합니다(기본 꺼짐).** 꺼져 있으면 러너에 `-NoCommit` 이 넘어가 파일만 고치고 `N개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.` 안내가 나옵니다. 켜면 `-Commit` 이 넘어가 **규칙 하나마다 커밋 하나**를 만듭니다(롤백 단위 = 규칙).
+  - GUI 가 넘기지 않는 **CLI 러너 전용 옵션**: `-DryRun` · `-VerifyCmd`(아래 컴파일 게이트) · `-ExePath` · `-IncludeGenerated`(`Run-SparrowCommentFix.ps1` 에만 있음). 자동화에서 쓸 때는 **`-Rules` 를 반드시 명시**하세요 — 생략하면 러너가 opt-in 규칙마다 Y/N 을 되묻고, 비대화형에서는 그 규칙들이 조용히 전부 꺼집니다.
 - `Run-SparrowAll.cmd`: GUI 없이 코드 규칙(Track A)·주석/레이아웃(Track B)만 순차 실행해야 할 때 쓰는 보조 진입점입니다.
 - `Compare-Sparrow.ps1`: 수정 전/후 Sparrow xls를 비교하는 G2 회귀 게이트입니다(PASS=0, FAIL=1).
 - `SparrowRunner.Gui/`: 통합 GUI 프로젝트입니다.

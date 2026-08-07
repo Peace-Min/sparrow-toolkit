@@ -14,29 +14,74 @@
     The .xls is NOT in the repo (it lives in Downloads). This test SELF-SKIPS (does not fail) when the .xls is
     absent, so it is safe to wire into validate.ps1 behind an opt-in switch. Never commits the .xls.
 
-    Run directly:   tests\sparrow-exhaustive-xls-test.ps1 [-XlsPath <path>] [-SampleCount 15] [-KeepWork]
+    xls 경로 결정 순서(명시 opt-in 우선):
+      1) -XlsPath <path>
+      2) $env:SPARROW_TEST_XLS
+      3) %USERPROFILE%\Downloads\issues_*.xls 중 최신 (자동 탐색)
+         → -NoAutoDiscover 또는 $env:SPARROW_TEST_XLS_NO_AUTODISCOVER=1 로 끌 수 있다.
+
+    [보안] stdout 은 공유물이다. 이 출력은 tests\_logs\validate-*.log 로 들어가고 CONTRIBUTING 은 실패 신고 시
+    그 로그 첨부를 지시한다 → 이 레포는 곧 public 이므로, 남의 회사 소스가 남의 이슈에 실리면 안 된다.
+    그래서 stdout 에는 다음이 절대 나가지 않는다:
+      - 해석된 xls 의 경로/파일명(사내 리포트 파일명에는 사람 ID 가 들어 있다)
+      - xls 가 가리키는 실제 소스 파일 경로/파일명
+      - 검출된 소스 코드 본문
+      - 사용자 계정명이 박힌 절대 경로(TEMP/레포 경로는 %TEMP%\... / <repo>\... 로 접어서 찍는다)
+    stdout 에는 출처 라벨과 '건수'만 남긴다. 진단 가치는 죽이지 않는다 — NOT-TRANSFORMED 잔여의 실제
+    파일:라인 + 코드 원문은 '로컬 상세 파일'(tests\_logs\exhaustive-notransformed-<stamp>.txt, .gitignore 대상)
+    에 그대로 기록하고, stdout 에는 그 파일의 상대 경로와 건수만 알린다. 상세 파일 첫 줄에 "당신의 소스가
+    들어 있으니 공유 전 확인하라"는 경고를 박는다.
+
+    Run directly:   tests\sparrow-exhaustive-xls-test.ps1 [-XlsPath <path>] [-SampleCount 15] [-KeepWork] [-NoAutoDiscover]
     Via validate:   validate.ps1 -IncludeSparrowExhaustiveXls
 #>
 param(
     [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-    # 기본값: Downloads 의 Sparrow 결과 xls 중 가장 최근 것(파일명 고정 금지 — 회차마다 달라 self-skip 으로 죽는다).
-    [string]$XlsPath = (
-        @(Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE 'Downloads') -Filter 'issues_*.xls' -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
-    ),
+    # 명시 지정용. 비우면 $env:SPARROW_TEST_XLS → Downloads 자동 탐색 순으로 해석한다.
+    # (파일명을 고정하면 회차마다 달라 늘 self-skip 으로 죽으므로 자동 탐색은 살려 둔다.)
+    [string]$XlsPath,
+    # 로컬 상세 파일에 체커별로 기록할 NOT-TRANSFORMED 잔여 샘플 수(0 = 무제한). stdout 에는 어차피 건수만 나간다.
     [int]$SampleCount = 15,
-    [switch]$KeepWork
+    [switch]$KeepWork,
+    [switch]$NoAutoDiscover
 )
 
 $ErrorActionPreference = "Stop"
 
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping exhaustive Sparrow xls test."; return }
-if ([string]::IsNullOrWhiteSpace($XlsPath) -or -not (Test-Path -LiteralPath $XlsPath)) {
-    Write-Host "Sparrow xls (Downloads\issues_*.xls) not found; skipping exhaustive Sparrow xls test (the .xls is not in the repo)."
+if (-not $dotnet) {
+    Write-Host "dotnet SDK not found; skipping exhaustive Sparrow xls test."
+    $global:SparrowTestSkip = "dotnet SDK 없음"
     return
 }
-Write-Host ("  xls: " + (Split-Path $XlsPath -Leaf))
+
+# ---- xls 경로 해석 (경로/파일명은 로그에 남기지 않는다) ----
+$xlsOrigin = ''
+if (-not [string]::IsNullOrWhiteSpace($XlsPath)) {
+    $xlsOrigin = '-XlsPath 로 명시 지정됨'
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:SPARROW_TEST_XLS)) {
+    $XlsPath = $env:SPARROW_TEST_XLS
+    $xlsOrigin = '$env:SPARROW_TEST_XLS 로 명시 지정됨'
+}
+elseif ($NoAutoDiscover -or (-not [string]::IsNullOrWhiteSpace($env:SPARROW_TEST_XLS_NO_AUTODISCOVER))) {
+    $XlsPath = ''
+    $xlsOrigin = '자동 탐색 비활성(-NoAutoDiscover)'
+}
+else {
+    $XlsPath = @(Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE 'Downloads') -Filter 'issues_*.xls' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+    $xlsOrigin = '자동 탐색됨: Downloads\issues_*.xls 중 최신'
+}
+
+if ([string]::IsNullOrWhiteSpace($XlsPath) -or -not (Test-Path -LiteralPath $XlsPath)) {
+    Write-Host "Sparrow xls not found; skipping exhaustive Sparrow xls test (the .xls is not in the repo)."
+    Write-Host ("  xls 후보: <{0}>  — 지정하려면 -XlsPath 또는 `$env:SPARROW_TEST_XLS" -f $xlsOrigin)
+    $global:SparrowTestSkip = ("실 xls 없음 ({0})" -f $xlsOrigin)
+    return
+}
+# 파일명/경로 대신 '출처 라벨 + 크기'만 남긴다.
+Write-Host ("  xls: <{0}>  ({1:N0} KB)" -f $xlsOrigin, ((Get-Item -LiteralPath $XlsPath).Length / 1KB))
 
 $toolsDir   = Join-Path $RepositoryRoot "tools\_internal"
 $syntaxProj = Join-Path $toolsDir "SparrowSyntaxFix\SparrowSyntaxFix.csproj"
@@ -53,6 +98,22 @@ $work = Join-Path $env:TEMP ("sparrow-exhaustive-" + [guid]::NewGuid().ToString(
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $genOut = Join-Path $work "out"
 New-Item -ItemType Directory -Force -Path $genOut | Out-Null
+
+# stdout 에 나가는 문자열에서 사용자 계정명이 박힌 절대 경로 접두를 접는다(%TEMP%\... / <repo>\...).
+# 접두 검사가 아니라 '치환'이다 — 생성기 요약처럼 "gen root:   C:\Users\<계정>\..." 로 경로가 문장 중간에
+# 박혀 오는 줄도 접어야 하기 때문. 사람은 여전히 붙여넣어 찾아갈 수 있고, 공유 로그에는 계정명이 없다.
+function Hide-MachinePath([string]$p) {
+    if ([string]::IsNullOrWhiteSpace($p)) { return $p }
+    $out = $p
+    foreach ($pair in @(@{ Prefix = $RepositoryRoot; Token = '<repo>' }, @{ Prefix = $env:TEMP; Token = '%TEMP%' })) {
+        $prefix = $pair.Prefix
+        if ($prefix) {
+            $out = [regex]::Replace($out, [regex]::Escape($prefix), $pair.Token,
+                                    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        }
+    }
+    return $out
+}
 
 function Invoke-Quiet([string]$dll, [string[]]$a) {
     $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
@@ -105,6 +166,7 @@ function Invoke-CheckerDiff([string]$slug, [string]$tool, [string]$rules) {
     return $changed.ToArray()
 }
 
+$script:completedOk = $false
 try {
     Write-Host "  building tools + generator (Release)..."
     if ((Invoke-Quiet "build" @($syntaxProj, "-c", "Release", "-v", "q")) -ne 0) { throw "SparrowSyntaxFix build failed" }
@@ -112,9 +174,11 @@ try {
     if ((Invoke-Quiet "build" @($genProj, "-c", "Release", "-v", "q")) -ne 0) { throw "generator build failed" }
 
     Write-Host "  generating snippets from xls (this reads all Track A/B findings)..."
-    $genExit = & $dotnet.Source $genDll "--xls" $XlsPath "--out" $genOut
-    $genExit | Write-Host
-    if ($LASTEXITCODE -ne 0) { throw "generator exited $LASTEXITCODE" }
+    # 생성기 stdout 도 공유 로그로 흘러가므로 계정명이 박힌 절대 경로(gen root)를 접어서 중계한다.
+    $genLines = & $dotnet.Source $genDll "--xls" $XlsPath "--out" $genOut
+    $genExitCode = $LASTEXITCODE
+    $genLines | ForEach-Object { Write-Host (Hide-MachinePath ([string]$_)) }
+    if ($genExitCode -ne 0) { throw "generator exited $genExitCode" }
 
     $manifestPath = Join-Path $genOut "manifest.csv"
     $rows = Import-Csv -LiteralPath $manifestPath -Encoding UTF8
@@ -126,13 +190,19 @@ try {
 
     $enc = [System.Text.Encoding]::UTF8
     $report = New-Object System.Collections.Generic.List[string]
+    # Emit  = 공유물(stdout + coverage-report.txt). 식별 가능한 것은 절대 넣지 않는다.
+    # Detail= 로컬 상세 파일 전용. 실 파일 경로/라인/코드 원문은 오직 여기로만 간다.
+    $detail = New-Object System.Collections.Generic.List[string]
     function Emit([string]$s) { $report.Add($s); Write-Host $s }
+    function Detail([string]$s) { $detail.Add($s) }
 
     Emit ""
     Emit "================ EXHAUSTIVE SPARROW TRACK A/B XLS COVERAGE ================"
-    Emit ("xls:        " + $XlsPath)
-    Emit ("generated:  " + (Join-Path $genOut "gen"))
-    Emit ("manifest:   " + $manifestPath)
+    # [보안] xls 의 경로/파일명은 찍지 않는다(사내 리포트 파일명에 사람 ID 가 들어 있고 이 출력은
+    # 신고용 로그로 첨부된다). 출처 라벨 + 읽어들인 findings 건수만 남긴다.
+    Emit ("xls:        <" + $xlsOrigin + ">  (findings " + @($rows).Count + "건)")
+    Emit ("generated:  " + (Hide-MachinePath (Join-Path $genOut "gen")))
+    Emit ("manifest:   " + (Hide-MachinePath $manifestPath))
     Emit ""
     Emit ("{0,-34} {1,6} {2,6} {3,8} {4,8} {5,8}" -f "checker(slug)", "total", "parseF", "transf", "notTr", "transf%")
     Emit ("-" * 82)
@@ -196,32 +266,68 @@ try {
         }
     }
 
+    # [보안] 여기가 예전에 사내 소스를 가장 많이 흘리던 자리다: 실 파일명 + 라인번호 + 코드 한 줄 원문을
+    # 수백 줄 stdout 으로 뱉었다. 이제 stdout 에는 '체커별 잔여 건수'만 남기고, 실 경로/코드 원문은
+    # 로컬 상세 파일로만 보낸다. 판정 로직과 건수는 그대로다(무엇을 검증하는지 불변).
     Emit ""
-    Emit "================ NOT-TRANSFORMED SAMPLES (real flagged lines the tool left unchanged) ================"
+    Emit "================ NOT-TRANSFORMED RESIDUALS (건수만 — 상세는 로컬 파일) ================"
+    Detail ("=== NOT-TRANSFORMED SAMPLES (real flagged lines the tool left unchanged) ===")
+    Detail ""
+    $totalOk = 0
+    $totalArt = 0
     foreach ($slug in $slugOrder) {
         if (-not $notTransSamples.ContainsKey($slug)) { continue }
         $meta = $checkerMeta[$slug]
         $ok = $notTransSamples[$slug].ok
         $art = $notTransSamples[$slug].artifact
         if ($ok.Count -eq 0 -and $art.Count -eq 0) { continue }
-        Emit ""
-        Emit ("#### {0}   [{1}]" -f $slug, $meta.checker)
+        $totalOk += $ok.Count
+        $totalArt += $art.Count
+
+        # 공유 로그: 슬러그/체커 키(도구 자신의 어휘, 레포에 이미 있는 상수) + 건수만.
+        Emit ("#### {0,-34} [{1}]  parse-ok 잔여 {2}건 · parse-fail 아티팩트 {3}건" -f $slug, $meta.checker, $ok.Count, $art.Count)
+
+        # 로컬 상세: 예전 stdout 과 동일한 내용(-SampleCount 로 체커당 상한, 0 = 무제한).
+        Detail ("#### {0}   [{1}]" -f $slug, $meta.checker)
+        $cap = if ($SampleCount -le 0) { $ok.Count } else { $SampleCount }
         $shown = 0
-        foreach ($s in $ok) { if ($shown -ge $SampleCount) { break }; Emit ("   " + $s); $shown++ }
-        if ($ok.Count -gt $SampleCount) { Emit ("   ... (+{0} more parse-ok residuals)" -f ($ok.Count - $SampleCount)) }
+        foreach ($s in $ok) { if ($shown -ge $cap) { break }; Detail ("   " + $s); $shown++ }
+        if ($ok.Count -gt $cap) { Detail ("   ... (+{0} more parse-ok residuals)" -f ($ok.Count - $cap)) }
         if ($art.Count -gt 0) {
-            $artShow = [math]::Min(3, $art.Count)
-            for ($i = 0; $i -lt $artShow; $i++) { Emit ("   " + $art[$i]) }
-            if ($art.Count -gt $artShow) { Emit ("   ... (+{0} more parse-fail artifacts)" -f ($art.Count - $artShow)) }
+            $artCap = if ($SampleCount -le 0) { $art.Count } else { [math]::Min(3, $art.Count) }
+            for ($i = 0; $i -lt $artCap; $i++) { Detail ("   " + $art[$i]) }
+            if ($art.Count -gt $artCap) { Detail ("   ... (+{0} more parse-fail artifacts)" -f ($art.Count - $artCap)) }
         }
+        Detail ""
+    }
+    Emit ("합계: parse-ok 잔여 {0}건 · parse-fail 아티팩트 {1}건" -f $totalOk, $totalArt)
+
+    # 로컬 상세 파일. tests\_logs\ 는 .gitignore 대상이라 커밋될 수 없고, 첫 줄이 공유 전 확인을 요구한다.
+    $logDir = Join-Path $RepositoryRoot "tests\_logs"
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $detailFile = Join-Path $logDir ("exhaustive-notransformed-" + (Get-Date).ToString("yyyyMMdd-HHmmss") + ".txt")
+    $header = @(
+        "!!! 주의: 이 파일에는 당신의(회사의) 실제 소스 파일 경로와 소스 코드 본문이 들어 있습니다.",
+        "!!! 공개 레포 이슈/PR/채팅에 그대로 붙여넣지 마세요. 공유 전에 반드시 내용을 직접 확인하고,",
+        "!!! 필요한 줄만 골라 익명화해서 옮기세요. (이 폴더 tests\_logs\ 는 .gitignore 대상이라 커밋되지 않습니다.)",
+        ("!!! 생성: {0} · 출처 xls: <{1}>" -f (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"), $xlsOrigin),
+        ""
+    )
+    [System.IO.File]::WriteAllText($detailFile, (($header + $detail) -join "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+    # 회전: 사내 소스가 든 파일이 무한히 쌓이지 않도록 최신 10개만 남긴다(이름 = 시각이라 이름 정렬 = 시간 정렬).
+    foreach ($old in @(Get-ChildItem -LiteralPath $logDir -Filter "exhaustive-notransformed-*.txt" -File -ErrorAction SilentlyContinue |
+                       Sort-Object Name -Descending | Select-Object -Skip 10)) {
+        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
     }
 
     $reportFile = Join-Path $genOut "coverage-report.txt"
     [System.IO.File]::WriteAllText($reportFile, ($report -join "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ""
-    Write-Host ("report written: " + $reportFile)
-    Write-Host ("generated snippets kept at: " + (Join-Path $genOut "gen"))
+    Write-Host ("report written: " + (Hide-MachinePath $reportFile) + "  (stdout 과 동일 — 식별 정보 없음)")
+    Write-Host ("NOT-TRANSFORMED 상세(실 경로·코드 원문, 공유 금지): " + (Hide-MachinePath $detailFile))
+    Write-Host ("generated snippets kept at: " + (Hide-MachinePath (Join-Path $genOut "gen")))
     Write-Host "exhaustive Sparrow xls coverage test complete."
+    $script:completedOk = $true
 }
 finally {
     if (-not $KeepWork) {
@@ -229,5 +335,10 @@ finally {
         Get-ChildItem -LiteralPath $work -Directory -Filter "run-*" -ErrorAction SilentlyContinue |
             ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
     }
-    Write-Host ("work dir: " + $work)
+    Write-Host ("work dir: " + (Hide-MachinePath $work))
 }
+
+# validate.ps1 신호 규약: 성공은 반드시 exit 0 (잔여 $LASTEXITCODE 로 인한 거짓 실패 방지).
+# 여기까지 왔다는 것은 try 블록이 throw 없이 끝났다는 뜻이다(실패는 전부 throw 로 나간다).
+if (-not $script:completedOk) { throw "exhaustive Sparrow xls test did not complete" }
+exit 0

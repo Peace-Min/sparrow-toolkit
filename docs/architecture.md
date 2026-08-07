@@ -59,7 +59,7 @@ GUI 는 Track A/B 실행 시 러너 `.ps1` 에 **아래 인자만** 넘긴다
 |---|---|---|
 | `-Solution <경로>` | `.sln` / `.csproj` / 폴더 | 대상. 러너는 **`.sln`/`.csproj` 파일이면 `Split-Path -Parent` 로 그 폴더로 환원**하고, 폴더면 그대로 소스 루트로 쓴다 |
 | `-Rules <a,b,c>` | 콤마 구분 규칙 키 | GUI 체크박스에서 켠 규칙들. 러너가 규칙마다 엔진을 한 번씩 돌린다 |
-| `-LogDir <경로>` | 폴더 | 러너 실행 로그(`Run-<이름>.<stamp>.log`)를 쓸 곳. GUI 는 대상 루트를 준다 |
+| `-LogDir <경로>` | 폴더 | 러너 실행 로그(`Run-<이름>.<stamp>.log`)를 쓸 곳. **GUI 는 대상 소스 루트를 준다** — 즉 사용자 레포에 로그가 쌓이고, 러너가 그걸 쓴 뒤 `git status` 를 돌려 "미커밋 변경" 경고를 스스로 유발한다([usage.md](usage.md#track-ab-러너-로그는-대상-소스-루트에-쌓인다)). 기존 러너는 이 폴더를 **만들지 않는다** — 없으면 `[FATAL]` 로 죽는다 |
 | `-FilesFrom <파일>` | CSV 또는 줄 목록 | 범위 트리에서 고른 파일 목록(manifest). **빈 목록이거나 소스 루트 밖 파일뿐이면 전체로 확대하지 않고 실패해야 한다** |
 | `-Commit` \| `-NoCommit` | (스위치) | GUI 의 [규칙별 커밋 생성] 체크 상태에 따라 **둘 중 하나가 반드시** 온다 |
 
@@ -70,7 +70,8 @@ GUI 는 그 외 인자를 넘기지 않는다. `-DryRun` · `-IncludeGenerated` 
 
 기존 러너 두 개(`tools/_internal/SparrowSyntaxFix/Run-SparrowSyntaxFix.ps1`,
 `tools/_internal/SparrowCommentFix/Run-SparrowCommentFix.ps1`)가 이 순서를 구현한다.
-**새 러너는 이 둘을 그대로 베끼면 된다.**
+**새 러너는 이 둘을 베끼되, `.cs` 하드코딩 4곳은 반드시 새 언어로 바꿔야 한다** —
+`-NoCommit` 이어도 죽는 자리가 하나 있다([extending.md 2.2.1](extending.md#221-필수-러너의-cs-하드코딩-4곳)).
 
 1. **소스 루트 확정** — `.sln`/`.csproj` 이면 부모 폴더, 폴더면 그대로.
 2. **엔진 바이너리 확보** — 우선순위:
@@ -87,8 +88,10 @@ GUI 는 그 외 인자를 넘기지 않는다. `-DryRun` · `-IncludeGenerated` 
 ### 계약을 지키는 확인 방법
 
 ```powershell
-# GUI 가 넘기는 것과 똑같은 형태로 러너를 직접 호출해 본다
-.\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1 `
+# GUI 가 넘기는 것과 똑같은 형태로 러너를 직접 호출해 본다.
+# -LogDir 폴더는 미리 있어야 한다(러너가 만들지 않는다). -Rules 는 반드시 명시한다(생략하면 대화형 프롬프트).
+New-Item -ItemType Directory -Force C:\work\logs | Out-Null
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1 `
     -Solution C:\work\Proj -Rules parens,obviousvar -LogDir C:\work\logs `
     -FilesFrom C:\work\files.csv -NoCommit
 ```
@@ -265,27 +268,41 @@ sparrow-toolkit/
 ### 6.1 단일 진입점 `validate.ps1`
 
 ```powershell
-./validate.ps1              # 빌드 없음: 소스 존재 확인 + 모든 PowerShell 테스트/러너 구문검사 (수 초)
-./validate.ps1 -All         # 전체 opt-in E2E (빌드+실행, .NET SDK 필요)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1        # 빌드 없음: 소스 존재 확인 + 모든 PowerShell 테스트/러너 구문검사 (수 초)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전체 opt-in E2E (빌드+실행, .NET SDK 필요) — 실제 WPF 창이 뜨고 수 분
 ```
 
 - 개별 스위치로 트랙별 실행 가능(`-IncludeSyntaxFixE2E`, `-IncludeCommentE2E`, `-IncludeSparrowE2E`,
-  `-IncludeSparrowMappingTests`, `-IncludeG2GateTests`, `-IncludeGuiUiaTests` …).
+  `-IncludeSparrowMappingTests`, `-IncludeG2GateTests`, `-IncludeCoreTests`, `-IncludeGuiUiaTests` …).
+- **`-All` 은 `-IncludeGuiUiaTests` 와 `-IncludeCoreTests` 를 포함한다.** 따라서 `-All` 은
+  **진짜 WPF 창을 띄웠다 닫으며 수 분이 걸린다.** 개별 스위치는 그 부분만 따로 돌릴 때 쓰는 것이지,
+  `-All` 에서 빠져 있다는 뜻이 아니다.
 - 전체 출력을 `tests/_logs/validate-<stamp>.log` 에 Tee 한다. 실패 시 그 경로를 안내하므로 신고 시 그 파일 하나면 된다.
+- 마지막에 **`실행 N · 스킵 M · 실패 K` 집계 배너**를 찍고, 하나라도 실패하면 실패 테스트 이름을 모아
+  **0 이 아닌 코드로 종료**한다. **전부 스킵이면 "E2E 단정 0개 실행" 경고**가 뜬다 — 그 실행은 게이트가 아니다.
+  자식 테스트의 신호 규약(성공 `exit 0` / 실패 `throw`·`exit≠0` / 스킵 `$global:SparrowTestSkip`)은
+  [CONTRIBUTING.md 3.1](../CONTRIBUTING.md#31-게이트-결과-읽는-법--새-테스트를-추가할-때의-신호-규약) 참조.
 - **`-All` 은 `-IncludeTrackCE2E` 를 포함하지 않는다** — `tests/e2e-lab/run-e2e.ps1` 은 커밋된 골든 fixture
   (`sample-before.xls`/`sample-after.xls`)를 재생성해 작업 트리를 더럽힌다. 돌렸으면 fixture 변경을 원복할 것.
-- 실 Sparrow xls 가 필요한 테스트는 입력이 없으면 **자동 skip**(실패가 아니다).
+- 실 Sparrow xls 파일이 필요한 테스트는 입력이 없으면 **자동 skip**(실패가 아니다). 그런 테스트는 둘뿐이다(6.2 참조).
 
 ### 6.2 픽스처 기반 회귀
 
 | 층 | 무엇 | 어디 |
 |---|---|---|
-| 엔진 단위(인프로세스) | 실제 rewriter 소스를 컴파일해 before/after 를 단정 | `tools/_internal/SparrowSyntaxFix/FixtureTests/`, `tools/_internal/SparrowXlsExport.Core/CoreTests/` |
+| 엔진 단위(인프로세스) | 실제 rewriter 소스를 컴파일해 before/after 를 단정 | `tools/_internal/SparrowSyntaxFix/FixtureTests/`, `tools/_internal/SparrowXlsExport.Core/CoreTests/`(게이트 진입점은 `tests/coretests-run.ps1`, `-All` 에 포함) |
 | 엔진 E2E(디스크) | 실제 파일에 대고 BOM/CRLF 보존·원자적 쓰기·생성파일 skip·`--dry-run`·멱등성 | `tests/sparrow-syntaxfix-fixtures.ps1`, `tests/sparrow-commentfix-fixtures.ps1`, `tests/sparrow-xlsexport-fixtures.ps1` |
 | 교차 규칙 | 규칙을 섞어 돌렸을 때의 멱등성·컴파일 | `tests/sparrow-loop-tests.ps1` |
-| 실 xls 기반 | 실제 검출 패턴 회귀(입력 없으면 skip) | `tests/sparrow-realxls-*.ps1`, `tests/sparrow-exhaustive-xls-test.ps1` |
+| **실 xls 에서 뜬 패턴**(입력은 스크립트 내장) | 실 xls 에서 **가져온 소스 조각을 스크립트에 박아 둔** 회귀. **실 xls 파일이 필요 없다** — .NET SDK 만 있으면 돈다 | `tests/sparrow-realxls-c3-tests.ps1`, `-forhoist-`, `-continuation-deep-`, `-blockpromote-` (4개) |
+| **실 xls 파일이 실제로 필요**(없으면 skip) | 실 xls 를 읽어 도는 유이한 둘 | `tests/sparrow-exhaustive-xls-test.ps1`, `tests/sparrow-realxls-scope-loop-tests.ps1` |
 | 게이트 | 전/후 xls 비교(G2) | `tests/g2-gate-tests.ps1` (`tools/Compare-Sparrow.ps1`) |
-| 파이프라인 | 익스포터 → 수정+빌드(G1) → G2 | `tests/e2e-lab/run-e2e.ps1` |
+| 파이프라인 | 익스포터 → 수정+빌드(G1) → G2 | `tests/e2e-lab/run-e2e.ps1` (+ 시험 대상 합성 프로젝트 `tests/e2e-lab/SampleApp/`) |
+
+> **`realxls-*` 라는 이름이 곧 "실 xls 파일이 필요하다" 는 뜻은 아니다.** 다섯 개 중 실제로 xls 파일을
+> 읽는 건 `scope-loop` 뿐이고, 나머지 넷은 실 xls 에서 **뽑아 온 소스 스니펫을 스크립트에 내장**해 둔 것이라
+> SDK 만 있으면 돈다. 실 xls 파일이 필요한 테스트는 `scope-loop` 와 `exhaustive` **둘뿐**이며,
+> 그 둘의 xls 해석 순서(자동 탐색 포함)와 끄는 법은
+> [CONTRIBUTING.md 3.2](../CONTRIBUTING.md#32-실-sparrow-xls-를-쓰는-테스트--자동-탐색과-끄는-법) 에 있다.
 
 모든 픽스처는 **합성 데이터**다. 실 Sparrow xls·사내 경로·실 식별자는 커밋하지 않는다([CONTRIBUTING.md](../CONTRIBUTING.md)).
 
@@ -328,7 +345,7 @@ sparrow-toolkit/
 |---|---|
 | `.sln` 파싱 | GUI 의 프로젝트 트리는 `.sln` 안의 일반 C# 프로젝트 라인을 기준으로 만든다. **Solution Folder / Shared Project / 특수 SDK 포맷은 미지원** — 필요하면 `SourceScopeDiscovery` 를 확장한다. |
 | 프로젝트 중복 | 같은 물리 폴더를 여러 `.csproj` 가 참조하면 트리에 파일이 중복 표시될 수 있다. 선택 manifest 는 중복을 제거하므로 실행은 중복되지 않는다. |
-| git 버전 | 러너의 작업범위 격리는 `git commit --only --pathspec-from-file` 에 의존한다(Windows Git 2.48.1 확인). 오래된 git 에서는 지원 여부 확인 필요. |
+| git 버전 | 러너의 작업범위 격리는 `git commit --only --pathspec-from-file --pathspec-file-nul` 에 의존한다. 이 조합은 **git 2.25 이상**에서 쓸 수 있고, **2.45.1 에서 `-Commit`·게이트 테스트 전부 통과를 실측**했다. 그보다 오래된 git 은 지원 여부 확인 필요. |
 | Track C basename 매칭 | Tier 3 는 **의도적으로 보수적**이다. xls `경로` 가 비어 있고 동명 파일이 여럿이면 추측하지 않고 제외한다. |
 | 스캔 접근 실패 | 권한 등으로 못 읽은 디렉터리는 아직 UI 경고로 표시하지 않는다. 필요하면 `SourceScopeDiscovery` 에 skipped count/message 를 추가한다. |
 | Roslyn ≠ Sparrow | **Roslyn 편집이 Sparrow 검출 소멸을 보장하지 않는다.** AST 경계가 서로 다르다. 진짜 게이트는 **Sparrow 재분석**(G2)이다. 자동수정 → 빌드(G1) → 재분석(G2) → 사람 리뷰(G3) 순으로 확인한다. |

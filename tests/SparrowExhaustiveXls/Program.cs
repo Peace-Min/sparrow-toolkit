@@ -88,7 +88,10 @@ namespace SparrowExhaustiveXls
                 }
             }
             if (xls == null || outDir == null) { Console.Error.WriteLine("usage: --xls <path> --out <dir>"); return 2; }
-            if (!File.Exists(xls)) { Console.Error.WriteLine("xls not found: " + xls); return 3; }
+            // 보안: 실 xls 의 경로/파일명은 stdout/stderr 에 찍지 않는다. 이 출력은 tests\_logs\validate-*.log 로
+            // 들어가고 CONTRIBUTING 은 실패 신고 시 그 로그 첨부를 지시한다 → 사내 리포트 파일명(사람 ID 포함)이
+            // 공개 레포 이슈에 실리면 안 된다.
+            if (!File.Exists(xls)) { Console.Error.WriteLine("xls not found (path withheld from log)"); return 3; }
 
             var cfgByKey = Checkers.ToDictionary(c => c.Key, c => c);
             string genRoot = Path.Combine(outDir, "gen");
@@ -195,7 +198,9 @@ namespace SparrowExhaustiveXls
             File.WriteAllText(Path.Combine(outDir, "manifest.csv"), manifest.ToString(), new UTF8Encoding(true));
 
             // Console summary.
-            Console.WriteLine("xls:               " + Path.GetFullPath(xls));
+            // 보안: 경로/파일명 대신 크기만 남긴다(위 주석 참조).
+            Console.WriteLine("xls:               <supplied by caller, path withheld from log> ("
+                              + (new FileInfo(xls).Length / 1024) + " KB)");
             Console.WriteLine("gen root:          " + Path.GetFullPath(genRoot));
             Console.WriteLine("total checker rows:" + totalRows);
             Console.WriteLine("track A/B kept:    " + abTotal);

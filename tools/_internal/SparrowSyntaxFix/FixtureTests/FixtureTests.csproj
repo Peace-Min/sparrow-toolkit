@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <Compile Include="..\RewriteEngine.cs" Link="engine\RewriteEngine.cs" />
-    <Compile Include="..\NullCastRewriter.cs" Link="engine\NullCastRewriter.cs" />
     <Compile Include="..\NullVarRewriter.cs" Link="engine\NullVarRewriter.cs" />
     <Compile Include="..\VarRewriteHelpers.cs" Link="engine\VarRewriteHelpers.cs" />
     <Compile Include="..\ObjectVarRewriter.cs" Link="engine\ObjectVarRewriter.cs" />

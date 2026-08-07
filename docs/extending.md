@@ -8,7 +8,7 @@
 | | 시나리오 | 난이도 | 손대는 곳 |
 |---|---|---|---|
 | **레시피 1** | [기존 C# 트랙에 규칙 추가](#레시피-1-기존-c-트랙에-규칙-추가) | 낮음 | 엔진 파일 1개 + 3줄 배선 + GUI 체크박스 + 픽스처 |
-| **레시피 2** | [새 언어 트랙 추가 (C/C++ 예시)](#레시피-2-새-언어-트랙-추가-cc-예시) | 중간 | 새 엔진 + 새 러너 + GUI 배선 7접점 |
+| **레시피 2** | [새 언어 트랙 추가 (C/C++ 예시)](#레시피-2-새-언어-트랙-추가-cc-예시) | 중간 | 새 엔진 + 새 러너(**`.cs` 하드코딩 4곳 교체**) + GUI 배선 11접점 |
 
 ---
 
@@ -36,9 +36,17 @@ Track A(`SparrowSyntaxFix`) 기준으로 설명한다. Track B(`SparrowCommentFi
 
 #### ① 엔진: rewriter 파일 하나
 
-`tools/_internal/SparrowSyntaxFix/HogeRewriter.cs` — 규칙 하나 = 파일 하나가 이 레포의 관례다.
-현재 13개가 있다(`ArrayVar`, `EmptyStmt`, `FieldSplit`, `ForHoist`, `ForVar`, `ForeachCast`, `LocalConst`,
-`NullCast`, `NullVar`, `ObjectInitializer`, `ObjectVar`, `ObviousVar`, `Parens`).
+`tools/_internal/SparrowSyntaxFix/HogeRewriter.cs` — 규칙 하나 = 파일 하나가 이 레포의 관례지만,
+**파일 수와 규칙 키 수는 1:1 이 아니다.** 숫자를 정확히 해 두면 헷갈릴 일이 없다.
+
+| 세는 대상 | 개수 | 비고 |
+|---|---|---|
+| 활성 rewriter 파일 (`*Rewriter.cs`) | **12** | `ArrayVar`, `EmptyStmt`, `FieldSplit`, `ForHoist`, `ForVar`, `ForeachCast`, `LocalConst`, `NullVar`, `ObjectInitializer`, `ObjectVar`, `ObviousVar`, `Parens` |
+| `SyntaxRule` 플래그 / CLI 규칙 키 (`Program.cs` 의 `RuleOrder`) | **14** | `ObjectVar` 와 `ArrayVar` 는 **한 파일이 `-safe`/`-narrowing` 두 키**를 담당한다 |
+| 그 밖의 CLI 입력 토큰 | — | `all`(전체) · `nullcast`(`nullvar` 의 legacy alias). **둘 다 규칙이 아니다** — `RuleOrder` 에 없고 카운트 맵에도 안 나온다. 러너도 alias 를 `$canonicalRules` 가 아니라 `$ruleAliases` 로 따로 두고 canonical 로 접는다 |
+
+`RewriteEngine.cs` 의 `RewriteResult.NullCastEdits` 도 `NullVarEdits` 로 넘겨주는 **옛 픽스처 문구용 back-compat 프로퍼티**일 뿐,
+별도 규칙이 아니다. 새 규칙을 셀 때 이것들을 규칙으로 착각하지 말 것.
 
 ```csharp
 internal sealed class HogeRewriter : CSharpSyntaxRewriter
@@ -115,8 +123,24 @@ internal enum SyntaxRule
    (기본 켜짐이면 `IsChecked="True"`. `[검토필요]` 규칙은 Content 앞에 `[검토필요] ` 를 붙이는 관례.)
 2. `MainWindow.xaml.cs` 의 `BuildJobs()` → `CollectRules(...)` 목록에 `(ASHoge, "hoge")` 추가.
    **이걸 빠뜨리면 체크박스는 보이는데 아무 일도 일어나지 않는다.**
-3. `MainWindow.xaml.cs` 의 `InitializeRuleInfo()` 에 `AddRuleInfo(ASHoge, 제목, 설명, 근거, 예제)` 추가 —
-   규칙 설명 패널이 채워진다.
+3. `MainWindow.xaml.cs` 의 `InitializeRuleInfo()` 에 `AddRuleInfo(ASHoge, 제목, 설명, 근거, 예제)` 추가.
+   이름과 달리 **단순 설명 등록이 아니다** — `AddRuleInfo` 는 툴팁·설명 패널과 함께
+   그 체크박스의 **`Checked`/`Unchecked` 이벤트까지 등록**한다. 빠뜨리면 설명 패널이 비는 데서 그치지 않고
+   **체크를 켜고 꺼도 요약바가 아예 갱신되지 않는다.**
+4. **요약바 카운트 두 곳.** 둘 다 `CollectRules` 와 **따로** 관리되므로 함께 고쳐야 한다.
+   - `MainWindow.xaml.cs` `UpdateSummary()` 의 `int count = CountChecked(ASObjectVarSafe, …)` 목록에 `ASHoge` 추가
+     — 요약바의 `코드 규칙 · 선택 N개`.
+   - `review-needed` 규칙이라면 `ReviewNeededTrackARules` 배열(Track B 면 `ReviewNeededTrackBRules`)에도 추가
+     — 요약바의 `검토필요 N`.
+
+   > **여기가 이 레시피에서 가장 놓치기 쉬운 곳이다.** 빠뜨리면 규칙은 정상 실행되는데
+   > **요약바 숫자만 하나 모자라게** 나온다. 그리고 **이 결함은 어떤 테스트도 잡지 못한다** —
+   > UIA 하네스는 탭·라벨·인자 전달을 단정할 뿐 요약바 카운트와 체크박스 집합의 일치를 단정하지 않는다.
+   > 눈으로 확인하는 수밖에 없다.
+   >
+   > `review-needed` 여부는 **네 곳이 반드시 일치**해야 한다: 엔진 `README.md` 규칙 표의 `Commit policy` 열(단일 진실)
+   > · 러너 `$labels` 의 `검토필요:` 접두 · `MainWindow.xaml` 체크박스 Content 의 `[검토필요] ` 접두
+   > · 위 `ReviewNeededTrackA/BRules` 배열. 어긋나면 "검토필요 커밋만 revert" 작업에서 위험 규칙이 통째로 누락된다.
 
 #### ⑥ 테스트: 픽스처
 
@@ -137,7 +161,8 @@ internal enum SyntaxRule
 - [ ] `RewriteEngine.Rewrite()` 적용 블록 + `NewCounts()` 키 (+ `RewriteResult` 프로퍼티)
 - [ ] `Program.cs`: `RuleOrder` / `TryParseRules` switch / `Usage()` 도움말
 - [ ] 러너: `$labels` / `$canonicalRules` / (opt-in 이면) `$optionalRules` / (기본이면) `$Rules` 기본값
-- [ ] GUI: `MainWindow.xaml` 체크박스 / `CollectRules` 쌍 / `AddRuleInfo`
+- [ ] GUI: `MainWindow.xaml` 체크박스 / `CollectRules` 쌍 / `AddRuleInfo` / **`UpdateSummary()` 의 `CountChecked` 목록** (+ `review-needed` 면 `ReviewNeededTrackA/BRules`)
+- [ ] `review-needed` 표기가 네 곳(엔진 README 표 · 러너 `$labels` · XAML 라벨 · `ReviewNeededTrack*Rules`)에서 일치
 - [ ] 픽스처: positive · negative · **멱등성** · **문자열 리터럴 안전성** · BOM/CRLF 보존
 - [ ] 엔진 README 규칙 표 갱신(skip 조건 + 잔여 위험 명시)
 - [ ] `./validate.ps1 -All` 통과
@@ -191,8 +216,8 @@ GUI 는 엔진을 모른다. **러너 `.ps1` 을 `powershell.exe` 로 실행하�
 |---|---|---|
 | `-Solution <경로>` | `.sln`/`.csproj`/폴더 (C/C++ 면 `.vcxproj`/`.sln`/폴더) | **파일이면 `Split-Path -Parent`, 폴더면 그대로** = 소스 루트 |
 | `-Rules <a,b,c>` | 콤마 구분 규칙 키 | 규칙마다 엔진을 한 번씩 실행 |
-| `-LogDir <경로>` | 폴더 | `Run-<이름>.<stamp>.log` 기록 |
-| `-FilesFrom <파일>` | CSV/줄 목록 | 그 목록만 대상. **비었거나 소스 루트 밖뿐이면 전체로 확대하지 말고 실패**시킬 것 |
+| `-LogDir <경로>` | 폴더 | `Run-<이름>.<stamp>.log` 기록. **폴더를 스스로 만들 것** — 기존 러너들은 안 만들어서 없으면 `[FATAL]` 로 죽는다. GUI 는 여기에 **대상 소스 루트**를 넘긴다([usage.md 진단 로그](usage.md#track-ab-러너-로그는-대상-소스-루트에-쌓인다)) |
+| `-FilesFrom <파일>` | CSV/줄 목록 | 그 목록만 대상. **비었거나 소스 루트 밖뿐이면 전체로 확대하지 말고 실패**시킬 것. GUI 는 **항상** 이 인자를 넘긴다 |
 | `-Commit` \| `-NoCommit` | 스위치 | `-Commit` 이면 규칙별 커밋, `-NoCommit` 이면 파일만 수정 |
 
 **가장 빠른 길: 기존 러너를 그대로 베낀다.**
@@ -204,15 +229,61 @@ GUI 는 엔진을 모른다. **러너 `.ps1` 을 `powershell.exe` 로 실행하�
 3. `Resolve-Tool` — 엔진 확보 순서를 새 엔진에 맞춘다.
    `-ExePath` → `publish\<엔진>.exe` → (소스+SDK 있으면) 증분 빌드 → 기존 `bin\Release\...`.
    **.NET 이 아닌 엔진이면 이 함수만 그 기술에 맞게 바꾸면 된다**(예: 반입한 네이티브 exe 경로 확인).
-4. 파일 글롭 확장자 — `*.cs` → `*.c`/`*.cc`/`*.cpp`/`*.h`/`*.hpp`, 제외 패턴도 언어에 맞게(생성 헤더, `moc_*`, 빌드 산출물 등).
-5. git 커밋/게이트 로직은 **그대로 둔다** — 언어 무관이다.
+4. **git 커밋/게이트 로직 — 반드시 고쳐야 한다.** 아래 [2.2.1](#221-필수-러너의-cs-하드코딩-4곳) 참조.
+   이건 선택이 아니다. **하나(pathspec 생성)는 `-NoCommit` 이어도 러너를 즉사시킨다.**
+5. 파일 글롭 확장자 — 이건 **러너에 없다.** 어느 레이어를 고쳐야 하는지는
+   아래 [2.2.2](#222-소스-파일-확장자는-러너가-아니라-엔진gui-에-있다) 참조.
 
-### 2.3 GUI 배선 — 7개 접점
+#### 2.2.1 (필수) 러너의 `.cs` 하드코딩 4곳
 
-전부 `tools/SparrowRunner.Gui/` 안이다.
+베낀 러너에는 **언어 무관이 아닌 `.cs` 문자열이 4군데** 있다. `Run-SparrowSyntaxFix.ps1` 기준 위치와 증상:
+
+| # | 위치 | 코드 | 안 고치면 |
+|---|---|---|---|
+| **1** | `New-GitPathspecFile` 안 | `if (-not $full.EndsWith('.cs', ...)) { continue }` | **러너가 즉사한다. 최우선.** 아래 설명 |
+| 2 | `Test-GitTargetChanged` 의 `-FilesFrom` 없는 폴백 | `git status --porcelain -- '*.cs'` | C/C++ 변경을 못 보고 **"변경 없음"으로 커밋을 조용히 건너뛴다** |
+| 3 | `Restore-GitTargets` 의 폴백 revert | `git checkout -- '*.cs'` | 게이트 실패 시 **C/C++ edits 가 되돌려지지 않는다** — 깨진 코드가 다음 규칙으로 넘어간다 |
+| 4 | `Invoke-GitCommitStep` 의 `-FilesFrom` 없는 경로 | `git add -- '*.cs'` | **C/C++ 변경이 커밋에서 통째로 누락된다** |
+
+**왜 1번이 치명적인가** — `New-GitPathspecFile` 호출은 **커밋 여부와 전혀 무관하게** 일어난다:
+
+```powershell
+if ($FilesFrom) { $gitPathspecFile = New-GitPathspecFile -Root $root -FilesFromPath $FilesFrom }
+if ($FilesFrom -and -not $gitPathspecFile) { throw "-FilesFrom에 소스 루트 아래 .cs 파일이 없습니다: $FilesFrom" }
+```
+
+`.cs` 필터가 `-FilesFrom` 목록을 전부 걸러내면 함수가 `$null` 을 돌려주고 **다음 줄이 throw** 한다.
+그리고 GUI 는 `-FilesFrom` 을 **언제나** 넘긴다(`BuildJobs()` 의 공통 인자 루프). 즉:
+
+> **`-NoCommit` 으로 실행해도, 커밋 코드에 도달하기 한참 전에 러너가 `[FATAL]` 로 죽는다.**
+> "커밋을 안 쓰니 git 로직은 상관없다" 는 성립하지 않는다.
+
+2\~4번은 `-FilesFrom` 이 없을 때만 타는 폴백/revert 경로라 **조용히 틀린다** — 즉사보다 나쁠 수 있다.
+확장자 집합을 러너 상단에 상수 하나(`$SourceGlobs = @('*.c','*.cc','*.cpp','*.h','*.hpp')`)로 빼고
+네 곳이 모두 그것을 참조하게 만드는 편이 안전하다.
+
+#### 2.2.2 소스 파일 확장자는 러너가 아니라 엔진/GUI 에 있다
+
+**러너에는 소스 파일 글롭이 없다.** 러너는 `-FilesFrom` 이 없을 때 엔진에 `$root`(폴더)만 넘기고,
+**열거는 엔진이 한다.** 그래서 "러너의 `*.cs` 를 바꾼다"는 지시대로 러너를 뒤지면 고칠 게 안 나오고,
+"이미 언어 무관이구나"로 오독하기 딱 좋다. 실제로 확장자를 정하는 곳은 둘이다.
+
+| 레이어 | 파일 | 무엇 | 새 언어에서 |
+|---|---|---|---|
+| **엔진** | `tools/_internal/SparrowSyntaxFix/FileDiscovery.cs` | `Directory.EnumerateFiles(resolved, "*.cs", SearchOption.AllDirectories)` + 단일 파일일 때의 `EndsWith(".cs")` 체크 + 생성/백업 제외 규칙 | **새 엔진에 자기 몫으로 새로 쓴다**(기존 파일을 고치는 게 아니다) |
+| **GUI** | `tools/SparrowRunner.Gui/SourceScopeDiscovery.cs` | 범위 트리 열거 `directory.EnumerateFiles("*.cs", SearchOption.TopDirectoryOnly)` + 대상이 파일일 때의 `.cs` 확장자 수용 체크 | **여기를 넓혀야** C/C++ 파일이 범위 트리에 뜬다. 이게 `-FilesFrom` manifest 의 원천이다 |
+
+**단, Track A/B 와 파일 집합이 섞이면 안 된다.** 범위 트리가 `.cs` 와 `.cpp` 를 한 집합으로 모으면
+C# 러너에 `.cpp` 가 넘어간다. 트랙별로 확장자 집합을 갈라 주는 편이 안전하다(2.3 의 마지막 불릿과 같은 얘기다).
+
+### 2.3 GUI 배선 — 11개 접점
+
+대부분 `tools/SparrowRunner.Gui/` 안이고, 배포·테스트 쪽 둘(6·7)만 밖이다.
+**0 번을 먼저 하지 않으면 나머지 10개를 다 해도 실행 버튼이 안 먹는다.**
 
 | # | 파일 | 무엇 |
 |---|---|---|
+| **0 · P0** | `MainWindow.xaml.cs` 실행 핸들러의 **범위 가드** | `EnsureScopeAsync(target)` 결과가 `SelectedFiles.Count == 0` 이면 `"선택된 .cs 파일이 없습니다"` 를 띄우고 **`BuildJobs()` 에 도달하기 전에 return** 한다. 범위 트리가 `.cs` 만 모으는 한 **C/C++ 폴더는 여기서 먼저 막힌다** — 새 러너를 아무리 잘 만들어도 호출조차 안 된다. [2.2.2](#222-소스-파일-확장자는-러너가-아니라-엔진gui-에-있다) 의 `SourceScopeDiscovery` 확장과 **한 쌍**이고, 메시지 문구도 `.cs` 고정이라 함께 고친다 |
 | 1 | `MainWindow.xaml.cs` (`private enum ActiveTrack { A, B, C, None }`) | 항목 추가 → `{ A, B, C, D, None }` (또는 `Cpp` 같은 이름) |
 | 2 | `MainWindow.xaml.cs` `CurrentTrack()` | 새 탭 `TabItem` 을 그 enum 값에 매핑 (`if (ReferenceEquals(selected, TrackDTab)) return ActiveTrack.D;`) |
 | 3 | `MainWindow.xaml` | `RulesTabs` 안에 `<TabItem x:Name="TrackDTab" AutomationProperties.AutomationId="TrackDTab" Header="C/C++ 코드 규칙">` + 규칙 체크박스들. **AutomationId 를 반드시 줄 것** — UIA 하네스가 그걸로 찾는다 |
@@ -220,6 +291,9 @@ GUI 는 엔진을 모른다. **러너 `.ps1` 을 `powershell.exe` 로 실행하�
 | 5 | `MainWindow.xaml.cs` `UpdateRunButtonForTrack()` / `UpdateSummary()` / `RulesTabs_SelectionChanged()` / `SectionTabs_SelectionChanged()` | 새 트랙의 실행 버튼 라벨(`"C/C++ 코드 규칙 수정 실행"`), 요약바 문구, 탭 전환 시 규칙 설명 초기화 분기 |
 | 6 | `tools/publish-airgap.ps1` | `$projects` 배열에 새 엔진 추가(현재 4종 → 5종). 반입 체크리스트 출력도 자동으로 늘어난다 |
 | 7 | `tests/gui-uia-tests.ps1` | `$SUB_TABS = @('코드 규칙', '주석·레이아웃')` 를 새 탭 포함으로 갱신 + 하위 탭 개수 단정 갱신 |
+| **8** | `MainWindow.xaml` 의 **경고 배너** | `SectionFixTab` 바로 안, `Grid.Row="0"` 의 주황 `Border` — **`RulesTabs` 바깥**이다. 즉 새 C/C++ 하위 탭을 골라도 **그대로 떠 있다.** 문구가 *"Roslyn C# 파서로 코드를 재작성하므로 C/C++ 등 다른 언어에는 쓸 수 없습니다. C/C++ 결과는 위의 [XLS 분리] 대분류를 사용하세요."* 라서, 고치지 않으면 **제품이 사용자에게 거짓말을 한다.** 선택한 하위 탭에 따라 문구를 바꾸거나 배너를 `RulesTabs` 안으로 옮긴다 |
+| **9** | `MainWindow.xaml.cs` `UpdateSummary()` 의 **`SectionHintText`** | 삼항의 **else 쪽**에 `"코드 자동수정: C# 전용입니다. …"` 가 묻혀 있다. `switch (track)` 케이스만 추가하고 이 줄을 지나치기 매우 쉽다 — 새 트랙에서도 "C# 전용" 이 그대로 뜬다 |
+| **10** | `MainWindow.xaml.cs` `BrowseFileButton_Click` 의 **파일 대화상자 필터** | `Filter = "Solution/Project (*.sln;*.csproj)\|*.sln;*.csproj\|모든 파일 (*.*)\|*.*"` — **`.vcxproj` 를 고를 수 없다.** [2.2 의 인자 표](#22-핵심-러너-계약만-지키면-gui-에-붙는다)는 `.vcxproj` 를 대상으로 명시하므로, 여기를 안 고치면 문서와 UI 가 어긋난다(사용자는 "모든 파일" 로 우회해야 한다) |
 
 여기에 더해:
 
@@ -230,11 +304,10 @@ GUI 는 엔진을 모른다. **러너 `.ps1` 을 `powershell.exe` 로 실행하�
 - 실행 핸들러에서 `runTrackA`/`runTrackB` 를 계산하는 곳(`bool runTrackA = track == ActiveTrack.A;` 형태)도
   새 트랙을 알아야 하고, `BuildJobs(...)` 시그니처에 새 플래그 인자를 늘려야 한다.
 - `MainWindow.xaml.cs` 의 `InitializeRuleInfo()` 에 새 체크박스들의 `AddRuleInfo(...)` 를 넣어야 설명 패널이 빈칸이 아니다.
-- **범위 트리는 지금 C# 전용이다.** `SourceScopeDiscovery` 가 `directory.EnumerateFiles("*.cs", ...)` 로
-  `.cs` 만 모으고, 대상이 파일일 때도 `.cs` 확장자만 받아들인다. C/C++ 파일이 트리에 뜨게 하려면
-  이 확장자 집합을 넓혀야 한다. **단, Track A/B 와 파일 집합이 섞이면 안 되므로**
-  트랙별로 확장자 집합을 갈라 주는 편이 안전하다(범위 트리는 `-FilesFrom` manifest 의 원천이라,
-  여기서 섞이면 C# 러너에 `.cpp` 가 넘어간다).
+  (레시피 1 의 ⑤ 와 같은 이유로 **`UpdateSummary()` 의 `CountChecked` 목록**도 새 트랙 몫을 추가해야 요약바 숫자가 맞는다.)
+- **범위 트리 확장자**는 위 표의 **0 번**과 [2.2.2](#222-소스-파일-확장자는-러너가-아니라-엔진gui-에-있다) 에서 다뤘다.
+  `SourceScopeDiscovery` 를 넓히는 것과 실행 핸들러 가드를 푸는 것은 **반드시 함께** 해야 하며,
+  트랙별로 확장자 집합을 갈라 두지 않으면 C# 러너에 `.cpp` 가 넘어간다.
 
 ### 2.4 설계 판단 하나: 대분류 라벨을 어떻게 할 것인가
 
@@ -246,13 +319,15 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 | 모습 | `[코드 자동수정]` → 하위 탭 `[C# 코드 규칙] [C# 주석·레이아웃] [C/C++ 코드 규칙]` | `[코드 자동수정 (C#)]` `[코드 자동수정 (C/C++)]` `[XLS 분리 (모든 언어)]` |
 | 장점 | 화면 수가 안 늘어난다. 공통 인프라(대상 경로 입력·범위 트리·커밋 체크박스)를 그대로 공유 | 언어별로 화면이 완전히 갈려 **입력이 다른 것**(대상 파일 확장자, 범위 트리 소스)을 자연스럽게 분리. 기존 C# 화면이 전혀 안 흔들림 |
 | 단점 | 탭이 늘어나 한 화면에 언어가 섞인다. 범위 트리가 두 언어의 파일을 함께 보여 혼동될 수 있다 | 대분류가 3개가 되어 최상단이 붐빈다. 공통 UI 를 복제하거나 UserControl 로 빼야 한다 |
-| 건드리는 곳 | 위 7접점 그대로 | 위 7접점 + `SectionTabs`/`IsXlsSection()` 계열 분기 전반 |
+| 건드리는 곳 | 위 11접점 그대로 | 위 11접점 + `SectionTabs`/`IsXlsSection()` 계열 분기 전반 |
 
 **판단 기준**: 범위 트리와 대상 입력이 C# 과 **같은 소스 트리**를 공유하면 (a), 실제로 다른 트리·다른 입력이면 (b).
 어느 쪽이든 **`XLS 분리 (모든 언어)` 라벨은 그대로 둔다** — 이미 참이다.
 
 라벨을 바꾸면 함께 고쳐야 하는 곳: `MainWindow.xaml` 의 `Header`,
 `tests/gui-uia-tests.ps1` 의 라벨 단정, `README.md`/`docs/usage.md` 의 화면 구성 표.
+**그리고 "C# 전용" 문구가 박혀 있는 두 곳** — 2.3 표의 **8**(경고 배너)과 **9**(`SectionHintText`).
+라벨만 중립화하고 이 둘을 놔두면 화면 안에서 서로 모순되는 문구가 동시에 보인다.
 
 ### 2.5 최소 검증 경로
 
@@ -261,12 +336,27 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 1. **엔진 단위 픽스처** — 새 엔진만 단독으로. positive / negative / 멱등성 / **문자열·주석 안 불변** / 인코딩·개행 보존.
    (Track A 의 `FixtureTests/`, Track B 의 `tests/sparrow-commentfix-fixtures.ps1` 이 본보기다.)
 2. **러너 dry 실행** — GUI 없이, GUI 가 넘길 인자 그대로.
+
+   > **전제조건 2가지.** 둘 다 안 지키면 러너가 시작하자마자 죽거나 조용히 아무것도 안 한다.
+   >
+   > 1. **`-LogDir` 폴더가 미리 존재해야 한다.** 기존 러너들은 `-LogDir` 을 만들지 않고
+   >    바로 그 안에 로그를 쓰므로, 폴더가 없으면 첫 `Out-File` 이 던지고 `[FATAL]` 로 중단된다.
+   >    (새 러너를 만들 때 `New-Item -ItemType Directory -Force` 를 넣어 두면 이 함정이 사라진다.)
+   > 2. **`-Rules` 를 반드시 명시한다.** 기존 러너는 `-Rules` 가 없으면 opt-in 규칙마다
+   >    `Read-Host` Y/N 프롬프트를 띄운다. 비대화형 stdin 에서는 응답이 전부 빈 문자열이 되어
+   >    **opt-in 규칙이 조용히 전부 꺼진 채 "변경 없음" 을 보고**한다 — 통과처럼 보이는 실패다.
+   >    자동화/CI 라면 예외 없이 `-Rules` 를 준다.
+
    ```powershell
+   New-Item -ItemType Directory -Force C:\work\logs | Out-Null   # ← 먼저
    .\tools\_internal\SparrowCppFix\Run-SparrowCppFix.ps1 `
        -Solution C:\work\CppProj -Rules parens -LogDir C:\work\logs `
        -FilesFrom C:\work\files.csv -NoCommit
    ```
+
    `-DryRun` 을 지원한다면 그걸로 먼저. 로그 파일이 `-LogDir` 에 생기는지, 규칙별 건수가 찍히는지 확인.
+   **대상은 남의 소스 트리가 아니라 샌드박스여야 한다** — 안전한 시험 대상은
+   [usage.md 의 "파괴적 기능을 안전하게 시험하기"](usage.md#파괴적-기능을-안전하게-시험하기-샌드박스) 참조.
 3. **GUI 탭 UIA 단정** — `tests/gui-uia-tests.ps1` 에 새 탭이 존재/선택 가능하고, 라벨·순서가 맞고,
    실행 버튼 라벨이 바뀌고, 그 탭에서만 새 러너가 호출되는지를 넣는다.
    `./validate.ps1 -IncludeGuiUiaTests` 로 돌린다(창이 잠깐 뜬다. 데스크톱 세션이 없으면 self-skip).
@@ -292,18 +382,22 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 - [ ] `.sln`/프로젝트 파일이면 부모 폴더로 환원, 폴더면 그대로
 - [ ] `-FilesFrom` 이 비었거나 루트 밖뿐이면 **전체로 확대하지 않고 실패**
 - [ ] 엔진 확보 순서(`-ExePath` → `publish\` → 빌드 → 기존 산출물)와 폐쇄망 폴백
-- [ ] 규칙별 실행 + `-LogDir` 에 타임스탬프 로그
+- [ ] 규칙별 실행 + `-LogDir` 에 타임스탬프 로그 (**`-LogDir` 폴더를 스스로 만든다** — 없으면 죽는 함정 제거)
+- [ ] **`.cs` 하드코딩 4곳을 새 언어 확장자로 교체**([2.2.1](#221-필수-러너의-cs-하드코딩-4곳)) — pathspec 생성 / `git status --porcelain` / `git checkout` / `git add`
 - [ ] `-Commit` 시 규칙별 커밋(선택 파일만: `--only --pathspec-from-file`) + `-VerifyCmd` 게이트
 
 **GUI**
 
+- [ ] **범위 가드 + `SourceScopeDiscovery` 확장자 집합** (2.3 의 **0 번** — 이걸 먼저 하지 않으면 나머지가 무의미)
 - [ ] `ActiveTrack` enum 항목 추가
 - [ ] `CurrentTrack()` 매핑
 - [ ] `MainWindow.xaml` 새 `TabItem` (+ **AutomationId**) + 규칙 체크박스(+ AutomationId 권장)
-- [ ] `BuildJobs()` 에 새 `RunnerJob`
+- [ ] `BuildJobs()` 에 새 `RunnerJob` (+ 맨 앞 조기 반환 가드에 새 플래그 추가)
 - [ ] 실행 버튼 라벨 / 요약바 / 탭 전환 분기 (`UpdateRunButtonForTrack`, `UpdateSummary`, `*_SelectionChanged`)
-- [ ] `InitializeRuleInfo()` 에 새 규칙 설명
-- [ ] 범위 트리 확장자 집합 확인
+- [ ] `InitializeRuleInfo()` 에 새 규칙 설명 + `UpdateSummary()` 의 `CountChecked` 목록
+- [ ] **경고 배너 문구**(2.3 의 8) — 새 탭 위에서 "C/C++ 에는 쓸 수 없습니다" 가 뜨지 않는다
+- [ ] **`SectionHintText`**(2.3 의 9) — "코드 자동수정: C# 전용입니다" 가 새 트랙에서 안 뜬다
+- [ ] **파일 대화상자 필터**(2.3 의 10) — `.vcxproj` 를 고를 수 있다
 
 **배포·테스트·문서**
 

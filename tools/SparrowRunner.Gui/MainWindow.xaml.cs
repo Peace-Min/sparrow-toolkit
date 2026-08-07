@@ -52,9 +52,12 @@ namespace SparrowRunner.Gui
         //   None = 방어용 폴백(로드 전 등 어느 하위 탭도 선택되지 않은 순간).
         private enum ActiveTrack { A, B, C, None }
 
-        // GUI 실행은 언제나 "파일만 수정, 커밋 없음"이다 — 러너에 -NoCommit 을 고정으로 넘긴다. 검토·커밋은
-        // 사용자가 git 으로 한다(git diff 가 DryRun 보다 상위 호환이고, 자동 커밋이 없으니 컴파일 게이트도 불필요).
-        // 자동 커밋 / DryRun / 생성 파일 포함은 CLI 러너 옵션(-Commit / -DryRun / -IncludeGenerated)으로 남아 있다.
+        // GUI 실행 모드는 [규칙별 커밋 생성](CommitCheck) 체크 상태가 결정한다:
+        //   꺼짐(기본) → 러너에 -NoCommit  : 파일만 수정, 커밋은 사용자가 git 으로 한다(git diff 로 검토).
+        //   켜짐        → 러너에 -Commit    : 규칙 하나 = 커밋 하나(규칙 단위 롤백 가능).
+        // 화면 안내(요약바·툴팁)와 실행 로그는 모두 ModeNotice / ModeDoneSuffix 를 거쳐 이 실제 모드를 말한다 —
+        // 예전에는 로그가 "커밋: 하지 않음 (-NoCommit 고정)" 을 무조건 찍어, 커밋을 켠 사용자에게 거짓을 보고했다.
+        // DryRun / 생성 파일 포함은 여전히 CLI 러너 전용 옵션(-DryRun / -IncludeGenerated)이다.
         private const string NoCommitNotice = "파일만 수정 · 커밋하지 않음 (git diff 로 검토 후 커밋)";
         private const string NoCommitDoneSuffix = "개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.";
         private const string CommitNotice = "규칙별 커밋 생성 (규칙 하나 = 커밋 하나, 규칙 단위 롤백 가능)";
@@ -65,6 +68,25 @@ namespace SparrowRunner.Gui
 
         /// <summary>실행 종료 안내 접미사. 커밋 여부에 따라 다음 행동(git diff / git log)이 달라진다.</summary>
         private string ModeDoneSuffix => CommitCheck?.IsChecked == true ? CommitDoneSuffix : NoCommitDoneSuffix;
+
+        /// <summary>실행 시작 로그 한 줄. 러너에 실제로 넘기는 스위치와 반드시 같은 것을 말한다(BuildJobs 참조).</summary>
+        private string ModeRunLogLine => CommitCheck?.IsChecked == true
+            ? "커밋: 규칙별로 커밋함 (러너에 -Commit — 규칙 하나 = 커밋 하나, git log 로 확인)"
+            : "커밋: 하지 않음 (러너에 -NoCommit — 검토 후 git 으로 직접 커밋하세요)";
+
+        // review-needed 규칙 목록(Track A). 단일 진실은 엔진 README
+        // (tools\_internal\SparrowSyntaxFix\README.md) 규칙 표의 'Commit policy' 열이고,
+        // 러너 Run-SparrowSyntaxFix.ps1 의 $labels '검토필요:' 접두(→ 커밋 접두 'sparrow(A)! ')와
+        // 아래 목록·XAML 의 '[검토필요] ' 라벨이 전부 그 표를 따라간다. 셋이 어긋나면 "검토필요 커밋만
+        // revert" 작업에서 위험 규칙이 통째로 누락된다(실제로 forvar/fieldsplit/emptystmt/objectinitializer 가 그랬다).
+        private CheckBox[] ReviewNeededTrackARules => new[]
+        {
+            ASForeachCast, ASObjectInitializer, ASNullVar, ASObjectVarNarrowing, ASLocalConst,
+            ASArrayVarNarrowing, ASForVar, ASFieldSplit, ASEmptyStmt, ASForHoist,
+        };
+
+        /// <summary>review-needed 규칙 목록(Track B). 러너 Run-SparrowCommentFix.ps1 의 $labels 와 일치한다.</summary>
+        private CheckBox[] ReviewNeededTrackBRules => new[] { BBlockPromote };
 
         private void CommitCheck_Changed(object sender, RoutedEventArgs e)
         {
@@ -454,7 +476,7 @@ namespace SparrowRunner.Gui
             AppendLog("scope: " + selectedFiles.Count + " selected / " + scope.TotalFiles + " discovered"
                       + (scope.ExcludedFiles > 0 ? " / " + scope.ExcludedFiles + " excluded" : ""));
             AppendLog("jobs: " + jobs.Count);
-            AppendLog("커밋: 하지 않음 (러너에 -NoCommit 고정 — 검토 후 git 으로 직접 커밋하세요)");
+            AppendLog(ModeRunLogLine);
             AppendLog(new string('-', 72));
 
             try
@@ -1273,9 +1295,9 @@ namespace SparrowRunner.Gui
                 "비제네릭 컬렉션 foreach의 명시 타입을 Cast<T>()와 var 조합으로 바꿉니다.",
                 "체커: PRACTICE.LOOP_VARIABLE.NOT_USED_IMPLICIT_TYPING. 검토필요 커밋 대상입니다.",
                 "foreach (XmlNode node in nodes)\r\n// ->\r\nforeach (var node in System.Linq.Enumerable.Cast<XmlNode>(nodes))");
-            AddRuleInfo(ASObjectInitializer, "연속 대입을 object initializer로 통합",
+            AddRuleInfo(ASObjectInitializer, "[검토필요] 연속 대입을 object initializer로 통합",
                 "객체 생성 직후 연속된 단순 속성/필드 대입을 initializer로 합칩니다.",
-                "체커: PRACTICE.OBJECT_INITIALIZATION.NOT_USED_INITIALIZER. 연속 구간만 처리합니다.",
+                "체커: PRACTICE.OBJECT_INITIALIZATION.NOT_USED_INITIALIZER. 연속 구간만 처리하며 검토필요 커밋 대상입니다.",
                 "var item = new Foo();\r\nitem.A = 1;\r\nitem.B = text;\r\n// ->\r\nvar item = new Foo { A = 1, B = text };");
             AddRuleInfo(ASNullVar, "[검토필요] typed null var 초기화",
                 "초기값이 없거나 null인 명시 지역변수를 typed null var 형태로 바꿉니다.",
@@ -1293,17 +1315,17 @@ namespace SparrowRunner.Gui
                 "선언 배열 타입을 var와 암시 배열 생성으로 줄입니다.",
                 "object[] 등 정적 타입 축소 가능성이 있어 검토필요 커밋 대상입니다.",
                 "int[] values = new int[] { 1, 2, 3 };\r\n// ->\r\nvar values = new[] { 1, 2, 3 };");
-            AddRuleInfo(ASForVar, "for 루프 초기화 변수를 var로 변경",
+            AddRuleInfo(ASForVar, "[검토필요] for 루프 초기화 변수를 var로 변경",
                 "for 초기화절의 명시 타입을 var로 바꿉니다.",
-                "체커: 루프 변수 암시적 타입 사용 권장.",
+                "체커: 루프 변수 암시적 타입 사용 권장. 검토필요 커밋 대상입니다.",
                 "for (int i = 0; i < count; i++)\r\n// ->\r\nfor (var i = 0; i < count; i++)");
-            AddRuleInfo(ASFieldSplit, "한 줄 다중 필드 선언 분리",
+            AddRuleInfo(ASFieldSplit, "[검토필요] 한 줄 다중 필드 선언 분리",
                 "한 줄에 여러 필드를 선언한 구문을 필드별 선언으로 나눕니다.",
-                "체커: 한 줄에 하나의 선언문 배치.",
+                "체커: 한 줄에 하나의 선언문 배치. 검토필요 커밋 대상입니다.",
                 "private int x, y;\r\n// ->\r\nprivate int x;\r\nprivate int y;");
-            AddRuleInfo(ASEmptyStmt, "불필요한 빈 문장 제거",
+            AddRuleInfo(ASEmptyStmt, "[검토필요] 불필요한 빈 문장 제거",
                 "불필요한 빈 문장 세미콜론을 제거합니다.",
-                "체커: 한 줄에 하나의 구문/불필요 문장 계열.",
+                "체커: 한 줄에 하나의 구문/불필요 문장 계열. 검토필요 커밋 대상입니다.",
                 "DoWork();;\r\n// ->\r\nDoWork();");
             AddRuleInfo(ASForHoist, "[검토필요] for 다중 선언자 분리",
                 "for 초기화절의 다중 선언자를 루프 밖 선언으로 분리합니다.",
@@ -1425,7 +1447,9 @@ namespace SparrowRunner.Gui
             UpdateXlsScopeSummary();
             SectionHintText.Text = track == ActiveTrack.C
                 ? "XLS 분리: 입력은 XLS 하나입니다. 프로젝트 경로가 필요 없고 소스를 수정하지 않습니다."
-                : "코드 자동수정: C# 전용입니다. 선택한 탭의 규칙만 실행하며, 파일만 고치고 커밋은 하지 않습니다.";
+                // 커밋 여부는 [규칙별 커밋 생성] 상태에 따라 달라지므로 여기서 단정하지 않는다.
+                // 그건 모드에 따라 갈리는 요약바(ModeNotice)와 실행 로그(ModeRunLogLine)가 말한다.
+                : "코드 자동수정: C# 전용입니다. 선택한 탭의 규칙만 실행하며, 소스 파일을 실제로 수정합니다.";
             int selectedFiles = _currentScope?.SelectedFiles.Count ?? 0;
             int totalFiles = _currentScope?.TotalFiles ?? 0;
             int excludedFiles = _currentScope?.ExcludedFiles ?? 0;
@@ -1448,8 +1472,7 @@ namespace SparrowRunner.Gui
                     int count = CountChecked(ASObjectVarSafe, ASObviousVar, ASArrayVarSafe, ASParens, ASForeachCast,
                         ASObjectInitializer, ASNullVar, ASObjectVarNarrowing, ASLocalConst, ASArrayVarNarrowing,
                         ASForVar, ASFieldSplit, ASEmptyStmt, ASForHoist);
-                    int review = CountChecked(ASForeachCast, ASNullVar, ASObjectVarNarrowing, ASLocalConst,
-                        ASArrayVarNarrowing, ASForHoist);
+                    int review = CountChecked(ReviewNeededTrackARules);
                     SummaryRulesText.Text = $"코드 규칙 · 선택 {count}개";
                     SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
                     break;
@@ -1458,7 +1481,7 @@ namespace SparrowRunner.Gui
                 {
                     int count = CountChecked(BTrailing, BSpace, BPeriod, BCapitalize, BFlatten, BMemberBlank,
                         BOneDeclaration, BOneStatement, BContinuation, BLinqAlign, BBlockPromote);
-                    int review = CountChecked(BBlockPromote);
+                    int review = CountChecked(ReviewNeededTrackBRules);
                     SummaryRulesText.Text = $"주석·레이아웃 · 선택 {count}개";
                     SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
                     break;

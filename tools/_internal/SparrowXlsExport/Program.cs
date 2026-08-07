@@ -111,7 +111,10 @@ namespace SparrowXlsExport
 
                 // Optional run report (machine-readable evidence of THIS run). Written ONLY to the explicit --report
                 // path, never into the output tree, so the exporter's "체커 폴더 + 항목 md만" contract is untouched and a
-                // run without --report is byte-identical to before. A failed report write is a warning, not a failure.
+                // run without --report is byte-identical to before. TryWrite ENFORCES that (it refuses a path inside
+                // --out, e.g. `--out X --report X\r.json`) instead of trusting the caller — the refusal comes back as
+                // a normal false + message. A failed/refused report write is a warning, not a failure: the export
+                // itself already succeeded and must keep exit 0.
                 if (report != null)
                 {
                     sw.Stop();

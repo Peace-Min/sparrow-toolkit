@@ -25,7 +25,7 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Pa
 
 $ErrorActionPreference = "Stop"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow real-pattern tests."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow real-pattern tests."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 $commentProj = Join-Path $RepositoryRoot "tools\_internal\SparrowCommentFix\SparrowCommentFix.csproj"
 $syntaxProj  = Join-Path $RepositoryRoot "tools\_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj"
@@ -249,3 +249,5 @@ finally {
 
 if ($failures.Count) { throw ("Sparrow real-pattern tests failed:`n  " + ($failures -join "`n  ")) }
 Write-Host "Sparrow real-pattern tests passed."
+# validate.ps1 신호 규약: 성공은 반드시 exit 0 (잔여 $LASTEXITCODE 로 인한 거짓 실패 방지).
+exit 0

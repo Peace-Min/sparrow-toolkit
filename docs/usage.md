@@ -15,11 +15,23 @@ Visual Studio 사용자는 다음 솔루션을 연다(레포 루트 기준 상�
 SparrowRunner.Gui/SparrowRunner.Gui.sln
 ```
 
-명령줄에서 GUI를 바로 실행하려면 다음 파일을 사용한다.
+명령줄에서 GUI를 바로 실행하려면 다음 파일을 사용한다. **받은 인자를 GUI에 그대로 전달**하므로
+`--trackc-xls` 같은 옵션도 여기에 붙이면 된다.
 
 ```text
-tools/Run-SparrowRunnerGui.cmd
+tools\Run-SparrowRunnerGui.cmd
+tools\Run-SparrowRunnerGui.cmd --trackc-xls C:\work\issues.xls
 ```
+
+exe를 직접 부르고 싶다면 경로는 다음과 같다.
+
+| 상황 | GUI 실행 파일 |
+| --- | --- |
+| `dotnet build -c Release` 후(개발 PC) | `tools\SparrowRunner.Gui\bin\Release\net8.0-windows\SparrowRunner.Gui.exe` |
+| `publish-airgap.ps1` 발행 후(폐쇄망 반입본) | `tools\SparrowRunner.Gui\publish\SparrowRunner.Gui.exe` |
+
+GUI가 받는 CLI 옵션: `--trackc-xls <경로>` · `--trackc-out <경로>` · `--guides-dir <DIR>` · `--log-dir <DIR>` ·
+`--screenshot-dir <DIR>` · `--trackc-autorun` · `--open-rule-manager`.
 
 ## GUI 화면 구성 — 대분류 2개
 
@@ -37,7 +49,7 @@ GUI 최상단에서 **무엇을 할지** 먼저 고른다. 두 대분류는 입�
 
 | 대분류 | 하위 탭 | 입력 | 범위 트리 | 성격 |
 | --- | --- | --- | --- | --- |
-| **코드 자동수정 (C#)** | **[코드 규칙]** / **[주석·레이아웃]** | 대상 `.sln`/`.csproj`/폴더 | **로컬 소스 스캔** | 소스 파일을 **수정**(파괴적, 커밋은 안 함), **C# 전용** |
+| **코드 자동수정 (C#)** | **[코드 규칙]** / **[주석·레이아웃]** | 대상 `.sln`/`.csproj`/폴더 | **로컬 소스 스캔** | 소스 파일을 **수정**(파괴적, 커밋은 [규칙별 커밋 생성] 체크 시에만), **C# 전용** |
 | **XLS 분리 (모든 언어)** | (없음) | **Sparrow 결과 XLS 하나** | **XLS 검출 경로** | **읽기전용**, **프로젝트 경로 불필요**, 언어 무관 |
 
 - **화면 명칭 ↔ 내부 트랙**: [코드 규칙] = Track A · [주석·레이아웃] = Track B · [XLS 분리] = Track C. 트랙은 코드/문서/커밋 메시지에만 쓰는 내부 명칭이고 화면에는 노출하지 않는다.
@@ -45,14 +57,20 @@ GUI 최상단에서 **무엇을 할지** 먼저 고른다. 두 대분류는 입�
 - **C/C++ 사용자는 [XLS 분리]만 쓰면 된다.** [코드 자동수정]은 Roslyn C# 파서 기반이라 다른 언어에 쓸 수 없고, 그 화면(및 프로젝트 경로 입력)은 [XLS 분리] 대분류에서는 아예 렌더되지 않는다.
 - `SparrowRunner.Gui.exe --trackc-xls <경로>` 로 기동하면 [XLS 분리] 대분류가 자동 선택된다.
 
-### GUI 는 커밋하지 않는다 (실행 옵션이 없는 이유)
+### 커밋 동작 — [규칙별 커밋 생성] 체크박스 (기본 꺼짐)
 
-[코드 자동수정] 화면에는 실행 방식 옵션이 없다. GUI 실행은 **언제나 "파일만 수정, 커밋 없음"** 이다 — 러너에 `-NoCommit` 을 고정으로 넘긴다.
+GUI 는 러너에 `-Commit` 과 `-NoCommit` 중 **반드시 하나**를 넘기고, 어느 쪽인지는 실행 줄의 **[규칙별 커밋 생성]** 체크박스가 정한다. 이 체크박스는 [코드 규칙]/[주석·레이아웃] 화면 전용이다([XLS 분리]는 소스를 건드리지 않으므로 숨겨진다).
 
-- 실행이 끝나면 로그와 요약바에 `N개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.` 가 뜬다. [대상 폴더 열기] 버튼으로 폴더를 바로 열 수 있다.
-- 변경 검토는 `git diff` 로 한다(라인 단위라 DryRun 의 "바뀔 파일·건수" 보고보다 상위 호환이다). 커밋은 사용자가 직접 한다.
+| 체크박스 | 러너에 넘어가는 것 | 결과 |
+| --- | --- | --- |
+| **꺼짐 (기본값)** | `-NoCommit` | 파일만 수정하고 커밋하지 않는다. 실행이 끝나면 로그와 요약바에 `N개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.` 가 뜬다 |
+| **켜짐** | `-Commit` | 러너가 **규칙 하나마다 커밋 하나**를 만든다. 롤백 단위가 규칙이 되어 "괄호는 채택, var 는 거부" 같은 선택적 되돌리기(`git revert <커밋>`)가 된다. `review-needed` 규칙은 커밋 메시지에 `검토필요` 가 드러난다 |
+
+- **기본값은 꺼짐이다.** 아무것도 건드리지 않고 실행하면 커밋은 일어나지 않는다.
+- 변경 검토는 `git diff` 로 한다(라인 단위라 DryRun 의 "바뀔 파일·건수" 보고보다 상위 호환이다). [대상 폴더 열기] 버튼으로 폴더를 바로 열 수 있다.
+- **규칙별 컴파일 게이트(`-VerifyCmd`)는 커밋 모드에서만 의미가 있다** — 게이트의 revert 기준선이 "직전 규칙 커밋" 이기 때문이다. GUI 는 `-VerifyCmd` 를 넘기지 않으므로, 게이트를 쓰려면 CLI 러너를 직접 호출한다.
 - 생성 파일(`.g.cs` / `.designer.cs` / `obj`·`bin` 등)은 GUI 에서 **언제나 제외**한다 — 빌드가 다시 만들어 내므로 고칠 이유가 없다.
-- **자동 커밋(`-Commit`) · `-DryRun` · 생성 파일 포함(`-IncludeGenerated`) · 규칙별 컴파일 게이트(`-VerifyCmd`) 는 CLI 러너 옵션으로 그대로 남아 있다.** 자동화/CI 에서 필요하면 `Run-SparrowSyntaxFix.ps1` / `Run-SparrowCommentFix.ps1` 을 직접 호출한다.
+- **GUI 가 넘기지 않는 CLI 전용 옵션**: `-DryRun` · `-VerifyCmd` · `-ExePath` · `-IncludeGenerated`(이건 `Run-SparrowCommentFix.ps1` 에만 있다). 자동화/CI 에서 필요하면 `Run-SparrowSyntaxFix.ps1` / `Run-SparrowCommentFix.ps1` 을 직접 호출한다 — 그때는 **`-Rules` 를 반드시 명시**한다(아래 [CLI 자동화 주의](#cli-자동화-주의사항) 참조).
 
 ### XLS 범위 트리 = 팀 분담 (크로스-PC 불일치 없음)
 
@@ -81,15 +99,25 @@ GUI와 러너는 평소 `dotnet run`/`dotnet build`로 동작한다. 이는 대�
    .\tools\publish-airgap.ps1 -DryRun
    ```
 
-2. **레포 폴더 트리 전체**를 폐쇄망 PC로 복사한다. 반드시 함께 넘겨야 하는 것:
-   - 방금 생성된 `publish\` 산출물 4곳(`SparrowRunner.Gui\publish\`, `_internal\SparrowSyntaxFix\publish\`, `_internal\SparrowCommentFix\publish\`, `_internal\SparrowXlsExport\publish\`)
+2. **레포 폴더 트리 전체**를 폐쇄망 PC로 복사한다. 반드시 함께 넘겨야 하는 것(경로는 전부 **레포 루트 기준**):
+   - 방금 생성된 `publish\` 산출물 4곳 — `tools\SparrowRunner.Gui\publish\`, `tools\_internal\SparrowSyntaxFix\publish\`, `tools\_internal\SparrowCommentFix\publish\`, `tools\_internal\SparrowXlsExport\publish\`
+     (레포 루트의 `SparrowRunner.Gui\` 폴더에는 `.sln` 하나만 있다. GUI **소스와 발행본은 `tools\SparrowRunner.Gui\` 쪽**이다 — 둘을 헷갈리지 말 것)
    - `tools\`의 러너/진입점(`Run-SparrowRunnerGui.cmd`, `Run-SparrowAll.cmd`, `_internal\...\Run-*.ps1`, `Compare-Sparrow.ps1`)
+
+   > **왜 `publish\` 만 떼어 가면 안 되고 트리 통째여야 하나.** GUI 는 기동하자마자 `ResolveSkillRoot()` 로
+   > 자기 exe 위치에서 위로 올라가며 **`SKILL.md` + `tools\Run-SparrowRunnerGui.cmd` +
+   > `tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1` 세 파일을 동시에** 갖춘 폴더를 찾는다.
+   > 그 폴더가 러너·`references\checkers\` 경로의 기준이 된다. 셋 중 하나라도 없으면 **예외를 던지고 창이 아예 안 뜬다.**
+   >
+   > **그리고 그 실패는 세션 로그를 한 줄도 남기지 않는다** — `ResolveSkillRoot()` 가 `SessionLog.Create` 보다
+   > 먼저 실행되기 때문이다. 증상은 "더블클릭했는데 아무 일도 안 일어남" 이다. 그때 무엇을 수집할지는
+   > [README 진단 로그](../README.md#진단-로그-문제가-났을-때-무엇을-첨부하나) 참조.
 
    > Track C 익스포터는 선행 문서를 읽지 않으므로 별도 반입 자료가 없다. 체커별 가이드를 각자 쌓아두었다면(`references\checkers\`) 그것만 원하는 대로 함께 옮기면 된다.
 
    > `publish\` 산출물은 머신마다 생성되는 것이라 저장소에 커밋하지 않는다(`.gitignore` 제외 대상). 반입은 파일 복사로 한다.
 
-3. 폐쇄망 PC에서 `tools\Run-SparrowRunnerGui.cmd`를 실행한다. 이 배치는 `SparrowRunner.Gui\publish\SparrowRunner.Gui.exe`가 있으면 그것을 바로 실행하고(없을 때만 `dotnet run`으로 폴백), 러너는 `publish\SparrowSyntaxFix.exe` / `publish\SparrowCommentFix.exe`를 자동으로 집어 쓴다(`dotnet build`/복원 불필요). Windows 기본 `powershell.exe`만 있으면 된다.
+3. 폐쇄망 PC에서 `tools\Run-SparrowRunnerGui.cmd`를 실행한다. 이 배치는 자기 폴더 기준으로 `SparrowRunner.Gui\publish\SparrowRunner.Gui.exe`(= 레포 루트 기준 `tools\SparrowRunner.Gui\publish\...`)가 있으면 그것을 바로 실행하고(없을 때만 `dotnet run`으로 폴백), 러너는 각 엔진 폴더의 `publish\SparrowSyntaxFix.exe` / `publish\SparrowCommentFix.exe`를 자동으로 집어 쓴다(`dotnet build`/복원 불필요). Windows 기본 `powershell.exe`만 있으면 된다.
 
 ### 대상 PC 런타임 요건
 
@@ -176,8 +204,9 @@ GUI의 [XLS 분리] 화면에는 xls/출력/범위 컨트롤과 함께 요약(**
 
 ## 진단 로그
 
-"언제·어떤 입력에서 뭐가 잘못됐나"를 나중에 판단할 수 있도록 네 종류의 증거(로그 3종 + 창 스냅샷)가 자동으로 남는다.
+"언제·어떤 입력에서 뭐가 잘못됐나"를 나중에 판단할 수 있도록 다섯 종류의 증거(로그 4종 + 창 스냅샷)가 남는다.
 기록은 전부 best-effort다 — 폴더가 읽기전용이어도 앱/테스트는 그대로 동작한다.
+**1~3 은 자동이고, 5(창 스냅샷)는 `--screenshot-dir` 를 줄 때만 활성이다.**
 
 ### 1) GUI 세션 로그 — `%LOCALAPPDATA%\SparrowRunner\logs\session-<yyyyMMdd-HHmmss>.log`
 
@@ -188,6 +217,43 @@ Program Files 같은 쓰기 불가 위치에서 실행해도 되도록 설치 �
 
 미처리 예외(Dispatcher/AppDomain/Task)도 이 파일에 기록된다(예외를 삼키지는 않는다 — 증거만 남긴다).
 정상 종료 시 마지막 줄은 `세션 종료 (정상)`이므로, **이 표식 없이 끊긴 로그는 비정상 종료(크래시/강제 종료)**로 읽으면 된다.
+
+> **⚠ 이 로그가 아예 안 생기는 경우가 하나 있다 — 시작 실패.**
+> GUI 는 생성자에서 `ResolveSkillRoot()`(스킬 루트 탐색)를 **`SessionLog.Create` 보다 먼저** 부르고,
+> `App.xaml.cs` 에는 미처리 예외 핸들러가 없다. 그래서 **폐쇄망에서 가장 흔한 실패인 "레포 루트를 못 찾음"** 은
+> 로그 파일이 열리기도 전에 일어나 **세션 로그를 0줄** 남긴다. 증상: 창이 안 뜨고 조용히 끝난다.
+>
+> 그때 수집할 것:
+> 1. **레포 트리에 이 셋이 다 있는지** — `SKILL.md` · `tools\Run-SparrowRunnerGui.cmd` ·
+>    `tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1`. **세 파일을 동시에** 갖춘 폴더가 스킬 루트다.
+>    `publish\` 폴더만 떼어 반입했다면 반드시 여기서 실패한다.
+> 2. **exe 의 실제 경로**(어느 폴더에서 기동했는지).
+> 3. **`cmd` 창에서 `tools\Run-SparrowRunnerGui.cmd` 를 직접 실행한 출력** — 예외 메시지가 콘솔에는 보인다.
+> 4. Windows **이벤트 뷰어 → Windows 로그 → 응용 프로그램**의 .NET Runtime 오류 항목.
+
+### Track A/B 러너 로그는 대상 소스 루트에 쌓인다
+
+Track A/B 를 GUI 로 돌리면 러너가 `Run-SparrowSyntaxFix.<stamp>.log` / `Run-SparrowCommentFix.<stamp>.log` 를
+**당신의 소스 루트**에 쓴다. GUI 가 러너의 `-LogDir` 로 **대상 경로에서 환원한 소스 루트**를 넘기기 때문이다
+(`%LOCALAPPDATA%` 가 아니다). 로그에는 규칙별 stdout 전문·exit 코드·커밋/게이트 판정이 들어간다.
+
+부작용 둘을 알고 있어야 한다.
+
+1. **실행할 때마다 대상 레포에 로그 파일이 하나씩 쌓인다.** 그 레포의 `.gitignore` 에 `*.log` 가 없으면
+   추적되지 않은 파일로 계속 늘어난다. 주기적으로 지우거나 대상 레포의 `.gitignore` 에 규칙을 넣는다.
+2. **러너가 자기 경고를 스스로 유발한다.** 러너는 로그를 **먼저 쓴 뒤** `git status --porcelain` 으로
+   작업트리를 검사하므로, 깨끗한 레포에서 실행해도 `작업트리에 미커밋 변경이 있습니다` 경고가 뜬다.
+   **안내일 뿐 실행을 막지 않는다** — 그 개수에 방금 생긴 로그 파일이 포함돼 있다고 보면 된다.
+
+대상 레포를 건드리기 싫으면 GUI 대신 CLI 러너를 직접 호출하고 `-LogDir` 를 다른 폴더로 준다.
+**그 폴더는 미리 만들어 둬야 한다** — 러너는 `-LogDir` 를 생성하지 않고 바로 그 안에 쓰므로,
+없으면 첫 줄을 쓰다 `[FATAL] Run-SparrowSyntaxFix 중단: ...` 으로 죽는다.
+
+```powershell
+New-Item -ItemType Directory -Force C:\work\sparrow-logs | Out-Null
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1 `
+    -Solution C:\work\MyApp -Rules parens,obviousvar -LogDir C:\work\sparrow-logs -NoCommit
+```
 
 ### 2) Track C 실행 리포트 — 같은 폴더의 `trackc-<stamp>.json` + `trackc-<stamp>.log`
 
@@ -210,9 +276,18 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 
 ```powershell
 # 리포트까지 남기며 익스포트(출력 폴더는 그대로 순수)
+# 개발 PC(dotnet build 후):
 .\tools\_internal\SparrowXlsExport\bin\Release\net8.0\SparrowXlsExport.exe issues.xls `
-    --out C:\work\out --guides C:\...\references\checkers --report C:\work\logs\run1.json
+    --out C:\work\out --guides ...\references\checkers --report C:\work\logs\run1.json
 ```
+
+> **폐쇄망 PC 에는 `bin\Release\net8.0\` 이 없다.** `bin\` 은 빌드 산출물이라 반입 대상이 아니고
+> `.gitignore` 도 막는다. 반입본에서 쓸 경로는 **`publish\`** 다.
+>
+> ```powershell
+> .\tools\_internal\SparrowXlsExport\publish\SparrowXlsExport.exe issues.xls `
+>     --out C:\work\out --report C:\work\logs\run1.json
+> ```
 
 ### 3) 테스트 진단 — `tests\_logs\` (gitignore)
 
@@ -234,7 +309,9 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 규칙 목록과 에디터가 겹치지 않는지, 관리창이 최소 900x560인지). 임계값은 `tests\gui-uia-tests.ps1` 상단 상수다.
 수치로는 드러나지 않는 것(빈 콤보, 잘못된 문구/색, 어색한 여백)은 PNG를 열어 눈으로 판단한다.
 
-### 4) 창 스냅샷 — `uia-<stamp>\shots\iter<i>\<순번>-<지점>-<타임스탬프>.png`
+### 4) 창 스냅샷
+
+파일 위치: `uia-<stamp>\shots\iter<i>\<순번>-<지점>-<타임스탬프>.png`
 
 이 GUI는 설치되지 않는 커스텀 exe라서 **OS 자동화 허용목록에 올릴 수 없다 = 외부에서 스크린샷을 찍을 수 없다.**
 그래서 앱이 **스스로 자기 창을 PNG로 렌더**한다(`RenderTargetBitmap` + `PngBitmapEncoder`).
@@ -295,12 +372,69 @@ foreach ($f in $files) {
 }
 ```
 
-(위 구문검사는 `.\validate.ps1`이 이미 포함한다.)
+(위 구문검사는 `validate.ps1`이 이미 포함한다.)
 
 Track C 익스포터/G2 게이트를 바꾼 경우:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\validate.ps1 -IncludeG2GateTests
-powershell -ExecutionPolicy Bypass -File .\tests\e2e-lab\run-e2e.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -IncludeG2GateTests
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\e2e-lab\run-e2e.ps1
 dotnet run --project .\tools\_internal\SparrowXlsExport.Core\CoreTests\CoreTests.csproj -c Release -- --fixtures-only
 ```
+
+> **실행 정책**: Windows 기본값은 `Restricted` 라 `.\validate.ps1` 를 그냥 부르면 막힌다.
+> 이 문서와 `README.md` 는 **`powershell -NoProfile -ExecutionPolicy Bypass -File <스크립트>` 형태를 표준으로 쓴다.**
+> 정책을 이미 완화해 둔 PC 라면 `.\validate.ps1` 처럼 짧게 써도 결과는 같다.
+
+## 파괴적 기능을 안전하게 시험하기 (샌드박스)
+
+[코드 자동수정]은 **소스 파일을 실제로 덮어쓴다.** 처음 쓰거나 새 규칙/새 러너를 시험할 때는
+**절대 실제 작업 레포에 바로 대지 말 것.** 이 레포에 시험용 합성 프로젝트가 이미 들어 있다.
+
+```text
+tests\e2e-lab\SampleApp\        # 합성 C# 5파일 + SampleApp.csproj (실 식별자 없음, 결함을 일부러 심어 둔 미니 프로젝트)
+```
+
+**절차** — 네 가지를 지키면 되돌릴 수 없는 사고가 나지 않는다.
+
+1. **복사본에서 한다.** 원본을 고치면 레포 픽스처가 더러워진다.
+
+   ```powershell
+   Copy-Item -Recurse .\tests\e2e-lab\SampleApp C:\work\sandbox\SampleApp
+   ```
+
+2. **`-LogDir` 폴더를 먼저 만든다.** 러너는 이 폴더를 만들지 않는다 — 없으면 `[FATAL]` 로 죽는다.
+
+   ```powershell
+   New-Item -ItemType Directory -Force C:\work\sandbox\logs | Out-Null
+   ```
+
+3. **`-DryRun` 으로 먼저 본다.** 파일을 쓰지 않고 규칙별 건수만 보고한다.
+4. **`-Rules` 를 반드시 명시한다.** 이유는 바로 아래.
+
+```powershell
+# 1차: 아무것도 안 쓰고 무엇이 바뀔지만 본다
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1 `
+    -Solution C:\work\sandbox\SampleApp -Rules parens,obviousvar `
+    -LogDir C:\work\sandbox\logs -DryRun
+
+# 2차: 실제로 고치되 커밋은 안 한다. 그 뒤 git diff 로 눈으로 확인
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1 `
+    -Solution C:\work\sandbox\SampleApp -Rules parens,obviousvar `
+    -LogDir C:\work\sandbox\logs -NoCommit
+```
+
+GUI 로 시험한다면 대상 경로에 **샌드박스 복사본**을 넣고, [규칙별 커밋 생성] 은 **꺼 둔 채로** 돌린 뒤 `git diff` 를 본다.
+
+### CLI 자동화 주의사항
+
+`-DryRun` 은 "자동화/CI 용" 옵션이지만 **러너 자체는 대화형이다.**
+`-Rules` 를 생략하면 러너가 opt-in 규칙 **10개마다 `Read-Host` Y/N 프롬프트**를 띄운다.
+비대화형 stdin(파이프라인·스케줄러·CI 러너)에서는 그 응답이 **전부 빈 문자열**이 되어
+**opt-in 규칙이 조용히 전부 꺼진 채** "변경 없음" 을 보고한다 — 실패처럼 안 보이는 실패다.
+
+- **CI/자동화에서는 예외 없이 `-Rules <a,b,c>` 를 명시한다.** 그러면 프롬프트 자체가 뜨지 않는다.
+- 커밋 여부도 마찬가지다. `-Commit` / `-NoCommit` / `-DryRun` 중 하나도 안 주면 러너가 커밋 여부를 되묻는다
+  (비대화형이면 커밋하지 않고 진행). **의도를 항상 스위치로 명시한다.**
+- GUI 는 이 함정에 걸리지 않는다 — 체크박스에서 규칙을 모아 `-Rules` 를 항상 채워 넘기고,
+  `-Commit`/`-NoCommit` 중 하나를 반드시 붙인다.

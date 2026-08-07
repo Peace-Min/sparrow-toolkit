@@ -1,0 +1,31 @@
+# 개행 고정 장치.
+#
+# CONTRIBUTING §4 는 "UTF-8 BOM 없음 + LF" 를 강제 규약으로 못박고, 이 레포는 실제로 인코딩 사고가 난 적이
+# 있다. 그런데 이 파일이 없으면 Windows 기본 클론(core.autocrlf=true)이 전 텍스트 파일을 CRLF 로 떨어뜨려,
+# 규약이 첫 클론부터 깨진 상태에서 편집이 시작된다(실측: README.md 18,106B(LF) -> 18,328B(CRLF)).
+# 그 상태에서 한 줄만 고쳐도 파일 전체가 diff 에 뜨고, 리뷰는 진짜 변경을 못 본다.
+#
+# 이 설정은 "지금 커밋되어 있는 바이트"를 바꾸지 않는다: 인덱스는 이미 전 텍스트 파일이 LF 다
+# (git ls-files --eol 로 확인). 아래 규칙은 그 LF 인덱스를 고정하고 작업 트리 개행만 결정론적으로 맞춘다.
+
+# 기본: 텍스트로 판별되는 모든 파일 = 인덱스 LF + 작업 트리 LF.
+* text=auto eol=lf
+
+# .cmd 만 작업 트리 CRLF 로 남긴다(인덱스는 동일하게 LF). 이 파일들은 폐쇄망 운영자가 탐색기에서
+# 더블클릭하는 진입점이라, LF 전용 배치 파일에서 알려진 cmd.exe 파싱 이슈(레이블/goto 탐색)를
+# 감수할 이유가 없다. 현재 작업 트리 상태와도 일치한다.
+*.cmd text eol=crlf
+
+# 바이너리: 어떤 텍스트/개행 변환도 하지 않는다(변환되면 파일이 깨진다).
+# *.xls 는 tests/e2e-lab 의 커밋된 골든 픽스처(실 BIFF), 나머지는 발행/빌드 산출물 형식이다.
+*.xls binary
+*.xlsx binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary

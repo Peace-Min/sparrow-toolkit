@@ -7,6 +7,9 @@
 // 항목 md만, 부산물 0", so the caller passes an explicit path OUTSIDE the output tree (the GUI uses its log
 // folder; the CLI uses --report <PATH>). Without that explicit path NOTHING is written, so a plain run stays
 // byte-identical to before.
+// The contract is ENFORCED, not merely documented: TryWrite rejects any report path that is the output folder
+// or sits under it (see IsInsideOutputTree) BEFORE creating anything. Callers used to be trusted to pass a safe
+// path, so `--out X --report X\r.json` — and a GUI --log-dir aimed at the output folder — quietly broke it.
 //
 // Everything here is best-effort: a failed report write is reported as false and never breaks the export.
 // Encoding: json + summary are UTF-8 WITHOUT BOM, LF newlines, 한글 unescaped (readable in any editor).
@@ -246,6 +249,13 @@ namespace SparrowXlsExport.Core
         /// Write <paramref name="report"/> as json to <paramref name="reportPath"/> and a human-readable summary to
         /// the companion "&lt;stem&gt;.log". Creates the parent directory. Returns false (with <paramref name="error"/>
         /// set) instead of throwing, so a read-only/locked log folder can never fail an export.
+        /// <para>
+        /// ENFORCES the hard contract stated at the top of this file: a report path that lands INSIDE the export
+        /// output tree (<see cref="TrackCRunReport.OutDir"/>, or any subdirectory of it) is REJECTED before anything
+        /// is created — the caller only had a comment promising this before, so <c>--out X --report X\r.json</c>
+        /// (or a GUI <c>--log-dir</c> pointed at the output folder) silently broke "체커 폴더 + 항목 md만, 부산물 0".
+        /// Rejection is a normal false/error return, so a rejected report never fails the export.
+        /// </para>
         /// </summary>
         public static bool TryWrite(string reportPath, TrackCRunReport report, out string? error)
         {
@@ -255,6 +265,17 @@ namespace SparrowXlsExport.Core
             try
             {
                 string full = Path.GetFullPath(reportPath.Trim().Trim('"'));
+
+                // Output-tree guard. Checked BEFORE Directory.CreateDirectory so a rejected path cannot even
+                // create a folder inside (or as) the output tree.
+                if (IsInsideOutputTree(full, report.OutDir, out string? outFull))
+                {
+                    error = "리포트 경로가 Track C 출력 폴더 안입니다 — 출력 계약(체커 폴더 + 항목 md만, 부산물 0)을 "
+                            + "깨므로 기록하지 않았습니다. 출력 폴더 밖 경로를 지정하세요. "
+                            + "report=" + full + " / out=" + outFull;
+                    return false;
+                }
+
                 string? dir = Path.GetDirectoryName(full);
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
@@ -274,6 +295,33 @@ namespace SparrowXlsExport.Core
                 error = ex.Message;
                 return false;
             }
+        }
+
+        /// <summary>
+        /// True when <paramref name="reportFullPath"/> IS the export output folder or sits anywhere under it.
+        /// The companion "&lt;stem&gt;.log" lives in the same directory, so guarding the json path guards both.
+        /// An empty/unresolvable <paramref name="outDir"/> means "no output tree to protect" → false (never
+        /// blocks a write on missing information).
+        /// </summary>
+        public static bool IsInsideOutputTree(string reportFullPath, string? outDir, out string? outFullPath)
+        {
+            outFullPath = null;
+            if (string.IsNullOrWhiteSpace(outDir)) return false;
+
+            string outFull;
+            try { outFull = Path.GetFullPath(outDir!.Trim().Trim('"')); }
+            catch { return false; }
+
+            outFull = outFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (outFull.Length == 0) return false;
+            outFullPath = outFull;
+
+            // Windows paths: case-insensitive. Compare against "<out>" and "<out>\" so a sibling folder whose
+            // name merely STARTS with the output folder name (out2 vs out) is not falsely rejected.
+            const StringComparison Cmp = StringComparison.OrdinalIgnoreCase;
+            if (string.Equals(reportFullPath, outFull, Cmp)) return true;
+            return reportFullPath.StartsWith(outFull + Path.DirectorySeparatorChar, Cmp)
+                || reportFullPath.StartsWith(outFull + Path.AltDirectorySeparatorChar, Cmp);
         }
 
         /// <summary>Path of the human summary that accompanies a json report ("&lt;stem&gt;.log").</summary>

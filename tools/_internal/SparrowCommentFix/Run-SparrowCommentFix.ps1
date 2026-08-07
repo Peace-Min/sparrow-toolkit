@@ -28,8 +28,10 @@
       .\Run-SparrowCommentFix.ps1 -Solution ...\MyApp.sln -Commit -VerifyCmd '"C:\...\msbuild.exe" ...\MyApp.sln /t:Build'  # 규칙별 커밋 전 컴파일 게이트(실패 규칙 revert)
 
     폐쇄망 참고: 이 툴은 Roslyn을 품은 컴파일 exe라, 대상 PC에 exe가 있어야 합니다. 러너는
-    (1) -ExePath  (2) 스크립트 옆 publish\SparrowCommentFix.exe  (3) bin\Release\net8.0\SparrowCommentFix.dll
-    (4) 없으면 `dotnet build`(패키지 복원 가능할 때)  순으로 확보합니다. 인터넷 없는 PC는 (1)/(2)로 반입 exe를 주세요.
+    (1) -ExePath  (2) 스크립트 옆 publish\SparrowCommentFix.exe  (3) csproj + SDK 가 있으면 '항상' 증분 `dotnet build`
+    (4) 그래도 없으면(빌드 실패/SDK 없음) 기존 bin\Release\net8.0\SparrowCommentFix.dll 폴백  순으로 확보합니다.
+    빌드가 dll 폴백보다 '먼저'인 이유: 오래된 bin dll을 그대로 쓰면 소스를 고쳐도 옛 규칙이 돌아
+    "안 고쳐졌다"처럼 보이는 사고가 실제로 있었습니다. 인터넷 없는 PC는 (1)/(2)로 반입 exe를 주세요.
 #>
 param(
     [string]$Solution,      # .sln / .csproj / 폴더 경로 (소스 루트)

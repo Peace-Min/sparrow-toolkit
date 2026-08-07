@@ -118,7 +118,7 @@ try {
 
 # ---- self-skip guards -----------------------------------------------------
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping GUI UIA tests."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping GUI UIA tests."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 try {
     Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -127,6 +127,7 @@ try {
 }
 catch {
     Write-Host "UI Automation assemblies unavailable; skipping GUI UIA tests. ($($_.Exception.Message))"
+    $global:SparrowTestSkip = "UI Automation 어셈블리 없음"
     return
 }
 
@@ -1345,3 +1346,5 @@ Log ""
 Log "진단 로그: $runDir"
 if ($failures.Count) { throw ("GUI UIA tests failed (진단 로그: $runDir):`n  " + ($failures -join "`n  ")) }
 Log ("GUI UIA tests passed ({0} iteration(s))." -f $Iterations)
+# validate.ps1 신호 규약: 성공은 반드시 exit 0 (잔여 $LASTEXITCODE 로 인한 거짓 실패 방지).
+exit 0

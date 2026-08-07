@@ -6,7 +6,10 @@
     기본 옵션으로 그냥 돌려도 Windows "Unlink of file ...pack-*.idx failed" 에러에 멈추지 않는다.
 
     기본 규칙셋은 이 스킬이 결정론으로 처리 가능한 Track A/B 전 규칙(신규 opt-in forvar/fieldsplit/emptystmt/
-    forhoist/blockpromote 포함)이다. 검토필요(review-needed) 규칙은 커밋 메시지에 '!' 로 표시된다.
+    forhoist/blockpromote 포함)이다. 검토필요(review-needed) 규칙은 커밋 메시지에 '검토필요' 가 드러난다 —
+    Track A 는 접두까지 갈라져 'sparrow(A)! 검토필요: ...' 이고(무엇이 review-needed 인지는 SparrowSyntaxFix\README.md
+    규칙 표가 단일 진실), Track B 는 접두가 항상 'sparrow(B): ' 이라 '!' 없이 라벨 본문에만 '검토필요' 가 붙는다
+    (blockpromote 하나뿐). 즉 '검토필요 커밋만 골라내기'는 '!' 가 아니라 '검토필요' 로 grep 해야 A/B 둘 다 잡힌다.
     (참고: 예전 dotnet-format 기반 러너는 MyApp x64(레거시 비-SDK 프로젝트)에서 무력이라 삭제했고, 지금은 Roslyn 기반 SparrowSyntaxFix 러너를 쓴다.)
 
     사용:

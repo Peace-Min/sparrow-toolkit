@@ -72,6 +72,10 @@ reserved for tests, automation, and precise re-runs.
 ## Validation
 
 ```powershell
-./validate.ps1          # fast: source presence + PowerShell syntax check
-./validate.ps1 -All     # full gate (build + E2E). PRs must pass this.
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1        # fast: source presence + PowerShell syntax check
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # full gate (build + E2E). PRs must pass this.
 ```
+
+`-All` includes the GUI UI-Automation harness, so it **opens a real WPF window and takes minutes**.
+It ends with a `실행 N · 스킵 M · 실패 K` banner and exits non-zero on any failure — **`실행 0` means no
+assertion ran at all and is not a pass.** Details: [CONTRIBUTING.md](CONTRIBUTING.md#3-테스트-게이트).

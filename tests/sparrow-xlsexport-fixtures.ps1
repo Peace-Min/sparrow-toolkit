@@ -10,6 +10,8 @@
 
     산출물 계약: <out>\<체커 키>\{ID}_{파일명}_{라인}.md 만 생성된다 —
     items\ 하위폴더도, index.csv 도, checkers.md 도, 요약/지침 md 도 만들지 않는다.
+    그 계약은 --report 로도 깨지지 않는다: 리포트 경로가 출력 폴더(또는 그 하위)면 도구가 거부하고
+    아무것도 만들지 않는다(거부는 경고일 뿐 익스포트는 exit 0 · md 산출물 불변). 아래 '가드)' 단정군이 이를 고정한다.
 
     PS 5.1 notes honored here: collections wrapped in @() before .Count; no &&/ternary/null-coalescing;
     md read with -Encoding UTF8 (the TOOL writes UTF-8 without BOM via .NET, not via PowerShell).
@@ -18,7 +20,7 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Pa
 
 $ErrorActionPreference = "Stop"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow XLS export E2E."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow XLS export E2E."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 $toolDir = Join-Path $RepositoryRoot "tools\_internal\SparrowXlsExport"
 $toolProj = Join-Path $toolDir "SparrowXlsExport.csproj"
@@ -33,10 +35,24 @@ function Check($name, [scriptblock]$cond) {
     catch { $script:failures += "$name ($($_.Exception.Message))" }
 }
 
+# 네이티브(dotnet) 호출은 $ErrorActionPreference='Stop' + 2>&1 아래에서 stderr 한 줄만 나와도
+# NativeCommandError 로 종료해 버린다(도구가 경고를 stderr 로 내는 순간 테스트가 죽는다) → 이 구간만 Continue.
 function Invoke-Tool {
     param([string[]]$ToolArgs)
-    & $dotnet.Source run --project $toolProj -c Release --no-build -- @ToolArgs 2>&1 | Out-Null
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { & $dotnet.Source run --project $toolProj -c Release --no-build -- @ToolArgs 2>&1 | Out-Null }
+    finally { $ErrorActionPreference = $prev }
     return $LASTEXITCODE
+}
+
+# stdout+stderr 를 문자열로 받아 단정에 쓴다(가드 거부 메시지 확인용). 한글 메시지는 콘솔 코드페이지에
+# 따라 깨질 수 있으므로 단정은 ASCII 조각(report= / out= / run report)만 본다.
+function Invoke-ToolCapture {
+    param([string[]]$ToolArgs)
+    $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { $text = & $dotnet.Source run --project $toolProj -c Release --no-build -- @ToolArgs 2>&1 | Out-String }
+    finally { $ErrorActionPreference = $prev }
+    return [pscustomobject]@{ Exit = $LASTEXITCODE; Text = $text }
 }
 
 function Get-MdCount {
@@ -168,6 +184,43 @@ try {
     $null = Invoke-Tool @($fixtureXls, "--out", $maxOut, "--max", "2")
     Check "--max 2 writes 2 md" { (Get-MdCount $maxOut) -eq 2 }
 
+    # --- 부산물 0 계약: --report 가 출력 폴더(또는 그 하위)면 거부한다 ---
+    # 도구 주석은 "리포트는 절대 출력 트리에 안 들어간다"고 약속했지만 실제로는 호출자를 믿기만 했다.
+    # 그래서 `--out X --report X\r.json` 이 그대로 통해 json + 동반 .log 2개가 출력 폴더에 생겼다(계약 파기).
+    # best-effort 원칙상 거부는 경고일 뿐이라 익스포트는 여전히 exit 0 이고 md 산출물도 그대로여야 한다.
+    $rptOut = Join-Path $work "rpt"
+    $insideReport = Join-Path $rptOut "run-report.json"
+    $g1 = Invoke-ToolCapture @($fixtureXls, "--out", $rptOut, "--report", $insideReport)
+    Check "가드) --report 가 출력 폴더 안이어도 익스포트는 성공(exit 0)" { $g1.Exit -eq 0 }
+    Check "가드) md 산출물은 그대로 4건" { (Get-MdCount $rptOut) -eq 4 }
+    Check "가드) 리포트 json 미생성" { -not (Test-Path -LiteralPath $insideReport) }
+    Check "가드) 동반 .log 미생성" { -not (Test-Path -LiteralPath (Join-Path $rptOut "run-report.log")) }
+    Check "가드) 출력 폴더는 md 만 (부산물 0)" {
+        ((Get-NonMdFiles $rptOut).Count -eq 0) -and (@(Get-ChildItem -LiteralPath $rptOut -File).Count -eq 0)
+    }
+    Check "가드) 거부가 조용하지 않다(경고 메시지에 report=/out= 경로 명시)" {
+        ($g1.Text -match "run report") -and ($g1.Text -match "report=") -and ($g1.Text -match "out=")
+    }
+
+    # 출력 폴더 '하위' 경로도 거부한다 — 하위 폴더를 새로 만들어 버리는 것 자체가 부산물이다.
+    $deepReport = Join-Path $rptOut "logs\run-report.json"
+    $g2 = Invoke-ToolCapture @($fixtureXls, "--out", $rptOut, "--report", $deepReport)
+    Check "가드) 출력 폴더 하위 경로도 거부(exit 0 유지)" { $g2.Exit -eq 0 }
+    Check "가드) 거부 시 하위 폴더를 만들지 않음" { -not (Test-Path -LiteralPath (Join-Path $rptOut "logs")) }
+    Check "가드) 두 번 거부 뒤에도 출력 폴더는 md 만" {
+        ((Get-NonMdFiles $rptOut).Count -eq 0) -and (@(Get-ChildItem -LiteralPath $rptOut -File).Count -eq 0)
+    }
+
+    # 과잉 차단 금지: 출력 폴더명으로 '시작만' 하는 형제 폴더(rpt-logs)는 정상 기록돼야 한다.
+    $siblingDir = $rptOut + "-logs"
+    $siblingReport = Join-Path $siblingDir "run-report.json"
+    $g3 = Invoke-ToolCapture @($fixtureXls, "--out", $rptOut, "--report", $siblingReport)
+    Check "가드) 출력 폴더 밖(접두만 같은 형제) 리포트는 정상 기록" { ($g3.Exit -eq 0) -and (Test-Path -LiteralPath $siblingReport) }
+    Check "가드) 정상 기록이면 동반 .log 도 생성" { Test-Path -LiteralPath (Join-Path $siblingDir "run-report.log") }
+    Check "가드) 형제 폴더에 써도 출력 폴더는 여전히 md 만" {
+        ((Get-NonMdFiles $rptOut).Count -eq 0) -and (@(Get-ChildItem -LiteralPath $rptOut -File).Count -eq 0)
+    }
+
     # --- idempotency: re-run default into the same dir -> identical md file set (폴더 포함 상대경로) ---
     $before = @(Get-ChildItem -LiteralPath $out -Recurse -Filter *.md -File | ForEach-Object { $_.Directory.Name + "\" + $_.Name } | Sort-Object)
     $null = Invoke-Tool @($fixtureXls, "--out", $out)
@@ -181,3 +234,6 @@ finally {
 
 if ($failures.Count) { throw ("Sparrow XLS export E2E failed:`n  " + ($failures -join "`n  ")) }
 Write-Host "Sparrow XLS export E2E passed."
+# validate.ps1 신호 규약: 성공은 반드시 exit 0. 안 그러면 이 스크립트 안에서 마지막으로 호출한
+# 네이티브 명령의 $LASTEXITCODE 가 부모에게 남아 거짓 실패로 잡힌다.
+exit 0

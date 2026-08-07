@@ -27,7 +27,7 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Pa
 
 $ErrorActionPreference = "Stop"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow mapping E2E."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow mapping E2E."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 $toolDir = Join-Path $RepositoryRoot "tools\_internal\SparrowXlsExport"
 $toolProj = Join-Path $toolDir "SparrowXlsExport.csproj"
@@ -187,3 +187,5 @@ finally {
 
 if ($failures.Count) { throw ("Sparrow mapping E2E failed:`n  " + ($failures -join "`n  ")) }
 Write-Host "Sparrow mapping E2E passed."
+# validate.ps1 신호 규약: 성공은 반드시 exit 0 (잔여 $LASTEXITCODE 로 인한 거짓 실패 방지).
+exit 0

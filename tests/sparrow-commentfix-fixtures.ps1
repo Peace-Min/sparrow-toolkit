@@ -20,7 +20,7 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Pa
 
 $ErrorActionPreference = "Stop"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping SparrowCommentFix E2E."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping SparrowCommentFix E2E."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 $toolDir = Join-Path $RepositoryRoot "tools\_internal\SparrowCommentFix"
 $toolProj = Join-Path $toolDir "SparrowCommentFix.csproj"
@@ -848,3 +848,6 @@ finally {
 
 if ($failures.Count) { throw ("SparrowCommentFix E2E failed:`n  " + ($failures -join "`n  ")) }
 Write-Host "SparrowCommentFix E2E passed."
+# validate.ps1 신호 규약: 성공은 반드시 exit 0. 이 스크립트는 "알 수 없는 규칙 -> exit 2" 단정으로 끝나므로
+# exit 0 이 없으면 통과인데도 $LASTEXITCODE=2 가 부모에 남아 거짓 실패가 된다.
+exit 0

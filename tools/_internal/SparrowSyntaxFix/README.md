@@ -11,16 +11,22 @@ accepts **14 rule keys** (`SyntaxRule` in `RewriteEngine.cs` is the single sourc
 `nullvar` (alias `nullcast`), `parens`, `objectvar-safe`, `foreachcast`, `obviousvar`,
 `objectvar-narrowing`, `localconst`, `objectinitializer`, `arrayvar-safe`, `arrayvar-narrowing`,
 `forvar`, `fieldsplit`, `emptystmt`, and `forhoist`.
-`foreachcast`, `objectinitializer`, `objectvar-narrowing`, `arrayvar-narrowing`, `localconst`, `nullvar`,
-and `forhoist` are review-needed or operator-confirmed rules and must stay isolated in their
-own rule run/commit.
+`nullcast` is a legacy **alias** of `nullvar`, not a rule of its own — both map to the same
+`SyntaxRule.NullVar` rewriter, and `Run-SparrowSyntaxFix.ps1` folds `-Rules nullvar,nullcast` back to a
+single run (otherwise the same rewriter ran twice and produced two identical commits).
+
+**`review-needed` 단일 진실은 아래 규칙 표의 `Commit policy` 열이다.** 러너(`Run-SparrowSyntaxFix.ps1`)의
+커밋 라벨과 GUI 체크박스 라벨/검토필요 카운트는 전부 이 표를 따라간다 — 표에서 `review-needed` 인 규칙은
+러너 라벨이 `검토필요:` 로 시작하고(→ 커밋 접두 `sparrow(A)! `), GUI 라벨이 `[검토필요] ` 로 시작하며
+GUI 요약의 "검토필요 N" 에 포함된다. 표를 고치면 그 세 곳을 함께 고쳐야 한다
+(`docs/extending.md` 레시피 1 의 체크리스트).
 
 Adding a rule? See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-트랙에-규칙-추가) —
 it lists every touch point (rewriter file, enum flag, `Program.cs` switch, runner labels, GUI checkbox, fixtures).
 
 ## Implemented rules
 
-### Rule 1 — `nullcast`  (checker `PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING`)
+### Rule 1 — `nullvar`  (legacy alias `nullcast`; checker `PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING`)
 
 Sparrow wants `var`, but `var x = null;` is illegal C# so IDE0007 declines it. A cast lets `var` infer the
 **identical** static type, so the transform is 100% semantics-preserving.
@@ -35,7 +41,7 @@ IFoo c = null;                            ->   var c = (IFoo)null;
 Matches ONLY a plain, single-declarator **local** statement whose sole initializer is the bare `null`
 literal. Hard skips (left byte-identical):
 
-- `= new ...` (object creation) — not handled by current `nullcast`. The next policy splits this into
+- `= new ...` (object creation) — not handled by `nullvar`. The next policy splits this into
   `objectvar-safe` and `objectvar-narrowing` (review-needed); see `track-a-roslyn-policy.md`.
 - `= default` / `= default(T)` — out of scope.
 - any non-`null` initializer (method call, member access, ternary, ...).
@@ -68,10 +74,12 @@ Both rules are **idempotent**: running twice makes no further change.
 
 ## Track A expansion rules
 
-The CLI supports these rules:
+All **14** CLI rule keys, with their commit policy. This table is the single source of truth for
+`review-needed` (see the note at the top); `nullcast` is not listed because it is only an alias of `nullvar`.
 
 | Rule | Transform | Commit policy |
 |---|---|---|
+| `parens` | `if (a > 0 && b)` → `if ((a > 0) && (b))` — every logical-operator operand parenthesized (Rule 2 above) | normal |
 | `objectvar-safe` | `Foo x = new Foo()` → `var x = new Foo()` when declaration type and construction type match | normal |
 | `foreachcast` | `foreach (XmlNode n in xs)` → `foreach (var n in System.Linq.Enumerable.Cast<XmlNode>(xs))`. **Value-type guard:** skipped when the element type is a numeric/implicit-conversion value type — predefined keywords (`int`/`long`/`double`/`decimal`/`bool`/`char`/…), well-known names bare or `System.`-qualified (`Int32`/`Int64`/`Double`/`Boolean`/…), or any nullable form (`T?`, `Nullable<T>`) — because there foreach does an implicit numeric conversion, not a cast, so `Cast<T>` would unbox to the wrong runtime type and throw `InvalidCastException`. (Reference/other named types are unaffected — their conversion IS a cast.) **Residual risk:** enums declared as named types are syntactically indistinguishable from classes and are NOT skipped — human review + build/Sparrow gates are the backstop. | `review-needed` |
 | `obviousvar` | `string s = "A"` → `var s = "A"`; `double d = 20` → `var d = (double)20` | normal |
@@ -99,10 +107,10 @@ sparrow(A)! review-needed: initialize explicit locals as typed null
 ## One-shot runner policy
 
 Normal operation must use `Run-SparrowSyntaxFix.ps1`, not direct `SparrowSyntaxFix --rules ...` calls.
-When `-Rules` is omitted, the runner asks for the solution/folder path, then asks Y/N for
-`foreachcast`, `objectinitializer`, `nullvar`, `objectvar-narrowing`, `localconst`, and
-`arrayvar-narrowing`, then asks whether to commit. Direct `-Rules` usage is reserved for tests,
-automation, and precise re-runs.
+When `-Rules` is omitted, the runner asks for the solution/folder path, then asks Y/N for each opt-in rule
+(`foreachcast`, `objectinitializer`, `nullvar`, `objectvar-narrowing`, `localconst`, `arrayvar-narrowing`,
+`forvar`, `fieldsplit`, `emptystmt`, `forhoist`), then asks whether to commit. Direct `-Rules` usage is
+reserved for tests, automation, and precise re-runs.
 
 Default safe rules are `objectvar-safe`, `obviousvar`, `arrayvar-safe`, and `parens`.
 
@@ -128,15 +136,18 @@ When given a directory it recurses for `*.cs`, **excluding** generated/backup fi
 Console output is greppable — one line per changed file plus an aligned summary:
 
 ```
-changed C:\...\Foo.cs  nullcast=2 parens=3
-rules:            nullcast,parens
+changed C:\...\Foo.cs  nullvar=2 parens=3
+rules:            nullvar,parens
 files found:      420
 generated skip:   12
 non-UTF8 skip:    0
 files changed:    137
-nullcast edits:   285
+nullvar edits:    285
 parens edits:     741
 ```
+
+(The per-rule lines use the **canonical** key — `nullvar`, never the `nullcast` alias — because the summary is
+emitted from `RuleOrder`, which only holds canonical keys.)
 
 ## One-call runner — `Run-SparrowSyntaxFix.ps1` (권장)
 
@@ -153,7 +164,7 @@ parens edits:     741
 
 .\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -DryRun                 # 미리보기(변경 안 함)
 .\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -Commit                 # 규칙별 자동 커밋
-.\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -Rules nullcast         # 테스트/자동화/정밀 재실행용 예외
+.\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -Rules nullvar          # 테스트/자동화/정밀 재실행용 예외
 .\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -FilesFrom files.csv    # (정밀) 지정한 파일만
 .\Run-SparrowSyntaxFix.ps1 -Solution ...\MyApp.sln -ExePath C:\tools\SparrowSyntaxFix.exe  # 폐쇄망: 반입 exe 지정
 ```
@@ -185,7 +196,7 @@ Typical flow against the legacy solution:
 SparrowSyntaxFix C:\src\MyApp --dry-run
 
 # 2) apply only the null-cast rule to a hand-picked file list (CSV or newline list)
-SparrowSyntaxFix --files-from files.csv --root C:\src\MyApp --rules nullcast
+SparrowSyntaxFix --files-from files.csv --root C:\src\MyApp --rules nullvar
 
 # 3) apply both across a subtree
 SparrowSyntaxFix C:\src\MyApp\Components

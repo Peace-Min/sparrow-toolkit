@@ -37,7 +37,7 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Pa
 
 $ErrorActionPreference = "Stop"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow real-xls blockpromote tests."; return }
+if (-not $dotnet) { Write-Host "dotnet SDK not found; skipping Sparrow real-xls blockpromote tests."; $global:SparrowTestSkip = "dotnet SDK 없음"; return }
 
 $toolRoot    = Join-Path $RepositoryRoot "tools\_internal"
 $commentProj = Join-Path $toolRoot "SparrowCommentFix\SparrowCommentFix.csproj"
@@ -211,3 +211,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 Write-Host "Sparrow real-xls blockpromote tests passed."
+# validate.ps1 신호 규약: 성공은 반드시 exit 0 (잔여 $LASTEXITCODE 로 인한 거짓 실패 방지).
+exit 0

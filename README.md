@@ -46,7 +46,9 @@ Sparrow 스캔 한 번이면 수천 건이 나온다. 그 중 상당수는 `var`
 
 ## 빠른 시작
 
-필요한 것: **Windows** + **.NET 8 SDK**(빌드 시). 폐쇄망 대상 PC는 SDK 없이 발행본만으로 돈다.
+필요한 것: **Windows** + **`net8.0` 을 빌드할 수 있는 .NET SDK**(8.0 이상이면 된다 — `global.json` 이 없어 버전을 고정하지 않는다)
+\+ 실행용 **.NET 8 런타임**. 폐쇄망 대상 PC는 SDK 없이 발행본만으로 돈다.
+자세한 요건과 실측(“.NET 8 SDK 없는 PC 에서 전 테스트 통과”)은 [CONTRIBUTING.md 1. 개발 환경](CONTRIBUTING.md#1-개발-환경).
 
 ```powershell
 # 1) GUI + Track C 코어 빌드 (이 솔루션에 담긴 프로젝트는 이 둘뿐이다)
@@ -61,6 +63,17 @@ dotnet build tools/_internal/SparrowXlsExport/SparrowXlsExport.csproj -c Release
 # 3) 실행
 tools\Run-SparrowRunnerGui.cmd
 ```
+
+`dotnet build` 로 만든 GUI 실행 파일 자체는 여기 있다 — **문서에 나오는 CLI 플래그
+(`--trackc-xls` · `--log-dir` · `--screenshot-dir` · `--guides-dir`)를 쓰려면 이 경로가 필요하다.**
+
+```text
+tools\SparrowRunner.Gui\bin\Release\net8.0-windows\SparrowRunner.Gui.exe
+```
+
+진입점 `tools\Run-SparrowRunnerGui.cmd` 는 받은 인자를 그대로 GUI 에 전달하므로
+`tools\Run-SparrowRunnerGui.cmd --trackc-xls C:\work\issues.xls` 처럼 써도 된다.
+폐쇄망 반입본에서는 `tools\SparrowRunner.Gui\publish\SparrowRunner.Gui.exe` 가 그 자리를 대신한다.
 
 ### 폐쇄망 반입(오프라인 발행)
 
@@ -100,7 +113,10 @@ GUI(`Sparrow Helper`) 최상단에서 **무엇을 할지** 먼저 고른다. 두
 - **[규칙별 커밋 생성]** 체크박스(A/B 화면 전용, 기본 꺼짐)를 켜면 러너가 **규칙 하나마다 커밋**을 만든다 —
   롤백 단위가 규칙이 되어 "괄호는 채택, var 는 거부" 같은 선택적 되돌리기(`git revert`)가 된다.
   러너의 **규칙별 컴파일 게이트(`-VerifyCmd`)** 도 이 모드에서만 의미가 있다.
-- **`-DryRun` · 생성 파일 포함(`-IncludeGenerated`) · `-VerifyCmd` 는 CLI 러너 옵션으로만 남아 있다**(자동화/CI 용).
+- **`-DryRun` · `-VerifyCmd` · `-ExePath` · 생성 파일 포함(`-IncludeGenerated`, Track B 러너에만 있다) 은
+  CLI 러너 전용 옵션이다**(자동화/CI 용). GUI 는 이것들을 넘기지 않는다.
+  **CLI 로 자동화할 때는 `-Rules` 를 반드시 명시한다** — 생략하면 러너가 대화형 프롬프트를 띄우고,
+  비대화형에서는 opt-in 규칙이 조용히 전부 꺼진다([docs/usage.md](docs/usage.md#cli-자동화-주의사항)).
 - **범위 선택 = 팀 분담**이지 검출 제외가 아니다. [XLS 분리]의 범위 트리는 **xls가 스스로 적어 둔 경로**로 만들고
   선택을 그 문자열 그대로 되먹이므로, 팀원마다 체크아웃 위치가 달라도 어긋나지 않는다(Tier 0 완전일치).
   자세한 4단계 매칭(Tier 0~3)은 [docs/architecture.md](docs/architecture.md#43-track-c-범위-매칭-tier-03).
@@ -155,40 +171,91 @@ GUI(`Sparrow Helper`) 최상단에서 **무엇을 할지** 먼저 고른다. 두
 | 하고 싶은 것 | 어디를 보나 | 요약 |
 |---|---|---|
 | **C# 트랙에 규칙 하나 추가** | [레시피 1](docs/extending.md#레시피-1-기존-c-트랙에-규칙-추가) | Rewriter 파일 1개 + enum 1줄 + `--rules` switch 1줄 + GUI 체크박스 + 픽스처 |
-| **C/C++ 등 새 언어 트랙 추가** | [레시피 2](docs/extending.md#레시피-2-새-언어-트랙-추가-cc-예시) | 자체 엔진 CLI + 러너 `.ps1`(계약 준수) + GUI 배선 7접점. **Track C 는 손대지 않는다** |
+| **C/C++ 등 새 언어 트랙 추가** | [레시피 2](docs/extending.md#레시피-2-새-언어-트랙-추가-cc-예시) | 자체 엔진 CLI + 러너 `.ps1`(계약 준수 + **`.cs` 하드코딩 4곳 교체**) + GUI 배선 11접점. **Track C 는 손대지 않는다** |
 | **체커별 조치 규칙 붙이기** | [docs/usage.md](docs/usage.md#규칙-라이브러리--체커-지정-자동-매핑-없음) | 규칙 라이브러리 + 명시적 지정(자동 매핑 없음) |
 
 ## 테스트
 
+Windows 기본 실행 정책은 `Restricted` 라 `.ps1` 을 그냥 실행하면 막힌다. **이 레포의 모든 스크립트는 아래 형태로 부른다.**
+
 ```powershell
-./validate.ps1            # 빠른 검사(빌드 없음): 소스 존재 + 전체 PowerShell 구문검사
-./validate.ps1 -All       # 전체 E2E(빌드+실행, .NET SDK 필요). 실 xls 필요한 테스트는 없으면 자동 skip
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All
 ```
 
-개별 트랙만: `./validate.ps1 -IncludeSyntaxFixE2E -IncludeCommentE2E -IncludeSparrowE2E`
-GUI 하네스만: `./validate.ps1 -IncludeGuiUiaTests` (실제 WPF 창을 띄워 UI Automation 으로 구동·단정한다)
+(실행 정책을 이미 완화해 둔 PC 라면 `.\validate.ps1 -All` 로 줄여 써도 같다. 문서에서 짧은 형태가 보이면 이 전제다.)
 
-`-All` 은 `-IncludeTrackCE2E` 를 **포함하지 않는다** — `tests/e2e-lab/run-e2e.ps1` 은 커밋된 골든 fixture xls 를
-재생성해 작업 트리를 더럽히므로 필요할 때만 명시 실행한다.
+| 명령 | 무엇 | 걸리는 시간 |
+|---|---|---|
+| `validate.ps1` | 빌드 없음: 소스 존재 + 전체 PowerShell 구문검사 | 수 초 |
+| `validate.ps1 -All` | **전체 게이트.** 빌드+E2E+`CoreTests`+**GUI UIA 하네스** | **수 분. 실제 WPF 창이 떴다 닫힌다** |
+| `validate.ps1 -IncludeSyntaxFixE2E -IncludeCommentE2E -IncludeSparrowE2E` | 개별 트랙만 | |
+| `validate.ps1 -IncludeGuiUiaTests` | **GUI 하네스만 따로** (`-All` 에도 이미 포함돼 있다) | |
+
+- 실 xls 가 필요한 테스트는 입력이 없으면 자동 skip 한다(실패가 아니다).
+  **xls 는 `%USERPROFILE%\Downloads\issues_*.xls` 에서 자동 탐색되며, 끄는 법이 있다** →
+  [CONTRIBUTING.md 3.2](CONTRIBUTING.md#32-실-sparrow-xls-를-쓰는-테스트--자동-탐색과-끄는-법).
+- 마지막 배너 `실행 N · 스킵 M · 실패 K` 를 확인한다. **`실행 0` 은 통과가 아니라 "단정이 하나도 안 돌았다"** 는 뜻이다.
+  실패가 있으면 0 이 아닌 코드로 종료하고 실패한 테스트 이름을 모아 출력한다.
+- 새 테스트를 추가한다면 신호 규약(성공 `exit 0` / 실패 `throw`·`exit≠0` / 스킵 `$global:SparrowTestSkip`)을 지킨다 →
+  [CONTRIBUTING.md 3.1](CONTRIBUTING.md#31-게이트-결과-읽는-법--새-테스트를-추가할-때의-신호-규약).
+- `-All` 은 `-IncludeTrackCE2E` 를 **포함하지 않는다** — `tests/e2e-lab/run-e2e.ps1` 은 커밋된 골든 fixture xls 를
+  재생성해 작업 트리를 더럽히므로 필요할 때만 명시 실행한다.
+
+### 파괴적 기능을 안전하게 시험하려면
+
+Track A/B 는 **소스를 실제로 고친다.** 남의 레포에 처음부터 대고 시험하지 말 것 —
+레포 안에 그 용도의 합성 C# 프로젝트가 이미 있다(`tests/e2e-lab/SampleApp/`).
+절차는 [docs/usage.md](docs/usage.md#파괴적-기능을-안전하게-시험하기-샌드박스) 한 곳에 모아 두었다.
 
 ## 진단 로그 (문제가 났을 때 무엇을 첨부하나)
 
-화면 로그는 앱을 닫으면 사라지므로 **네 곳**에 사후 판단용 증거가 남는다. 전부 자동·best-effort다.
+화면 로그는 앱을 닫으면 사라지므로 **다섯 곳**에 사후 판단용 증거가 남는다. 기록은 전부 best-effort 다
+(못 써도 앱은 그대로 동작한다). **자동으로 남는 것과 인자를 줘야 남는 것이 섞여 있으니 아래 "활성 조건" 열을 볼 것.**
 
-| 무엇 | 어디 | 들어있는 것 |
-|---|---|---|
-| **GUI 세션 로그** | `%LOCALAPPDATA%\SparrowRunner\logs\session-<stamp>.log` | 시작 헤더(앱 버전·인자·OS/.NET·PID) + 화면 로그 전 줄 + 미처리 예외 + `세션 종료 (정상)` 표식. 최신 20개 |
-| **Track C 실행 리포트** | 같은 폴더의 `trackc-<stamp>.json` (+ 사람용 `.log`) | 입력 xls 경로/크기/**sha256**, 소요, 옵션, 전체/매칭/기록 수, 체커별 건수, 지정 규칙·부착 건수, 범위 진단, 경고 |
-| **테스트 진단** | `tests/_logs/` (gitignore) | `uia-<stamp>/result.log` · `tree-*.txt`(UIA 트리 덤프) · `gui-logs/` · 실패 시 `FAILURE-CONTEXT-*.txt` · `validate-<stamp>.log` |
-| **창 스냅샷(PNG)** | `tests/_logs/uia-<stamp>/shots/iter<N>/*.png` (gitignore) | **앱이 스스로 렌더한 실제 창 이미지** |
+| 무엇 | 어디 | 활성 조건 | 들어있는 것 |
+|---|---|---|---|
+| **GUI 세션 로그** | `%LOCALAPPDATA%\SparrowRunner\logs\session-<stamp>.log` | 자동 | 시작 헤더(앱 버전·인자·OS/.NET·PID) + 화면 로그 전 줄 + 미처리 예외 + `세션 종료 (정상)` 표식. 최신 20개 |
+| **Track C 실행 리포트** | 같은 폴더의 `trackc-<stamp>.json` (+ 사람용 `.log`) | 자동(Track C 실행마다) | 입력 xls 경로/크기/**sha256**, 소요, 옵션, 전체/매칭/기록 수, 체커별 건수, 지정 규칙·부착 건수, 범위 진단, 경고 |
+| **Track A/B 러너 로그** | **대상 소스 루트**의 `Run-SparrowSyntaxFix.<stamp>.log` / `Run-SparrowCommentFix.<stamp>.log` | 자동 | 규칙별 stdout 전문 + exit 코드 + 커밋/게이트 판정. **아래 주의 참조** |
+| **테스트 진단** | `tests/_logs/` (gitignore) | 테스트 실행 시 | `uia-<stamp>/result.log` · `tree-*.txt`(UIA 트리 덤프) · `gui-logs/` · 실패 시 `FAILURE-CONTEXT-*.txt` · `validate-<stamp>.log` |
+| **창 스냅샷(PNG)** | `tests/_logs/uia-<stamp>/shots/iter<N>/*.png` (gitignore) | **`--screenshot-dir <DIR>` 를 줄 때만** (UIA 하네스는 항상 준다) | **앱이 스스로 렌더한 실제 창 이미지** |
 
 - 리포트는 **절대 Track C 출력 폴더에 쓰지 않는다** — 출력 폴더의 "부산물 0" 계약을 유지한다.
 - **UI 관련 문제 신고**: `shots/**/*.png`(실제 화면) + `tree-*.txt`(수치)를 함께 첨부한다.
-- 로그 위치 변경: `SparrowRunner.Gui.exe --log-dir <DIR>`, `./validate.ps1 -LogDir <DIR>`.
+- 로그 위치 변경: `SparrowRunner.Gui.exe --log-dir <DIR>`, `validate.ps1 -LogDir <DIR>`.
+- **로그 첨부 전 내용 확인**: 실 xls 를 쓰는 테스트가 돌았다면 진단 파일에 사내 소스 조각이 섞일 수 있다 →
+  [CONTRIBUTING.md 3.2](CONTRIBUTING.md#32-실-sparrow-xls-를-쓰는-테스트--자동-탐색과-끄는-법).
+
+> **⚠ Track A/B 러너 로그는 당신의 소스 루트에 쌓인다.** GUI 가 러너의 `-LogDir` 로 **대상 소스 루트**를 넘기기 때문이다.
+> 부작용 둘:
+> 1. 실행할 때마다 대상 레포에 `Run-SparrowSyntaxFix.<stamp>.log` 가 하나씩 늘어난다 —
+>    그 레포의 `.gitignore` 에 `*.log` 가 없으면 **추적되지 않은 파일로 계속 쌓인다.**
+> 2. 러너는 그 로그를 **먼저 쓴 뒤** `git status --porcelain` 으로 작업트리를 검사하므로,
+>    깨끗한 레포에서도 **"작업트리에 미커밋 변경이 있습니다" 경고를 러너가 스스로 유발**한다.
+>    이 경고는 안내일 뿐 실행을 막지 않는다.
+>
+> 대상 레포를 더럽히기 싫으면 GUI 대신 CLI 러너를 직접 부르고 `-LogDir` 를 다른 폴더로 준다.
+> 그때 **그 폴더는 미리 만들어 둬야 한다** — 러너는 `-LogDir` 를 만들지 않고 바로 그 안에 쓰므로,
+> 없으면 첫 줄을 쓰다 `[FATAL]` 로 죽는다.
+
+**시작 실패는 로그가 한 줄도 안 남는다 (폐쇄망에서 가장 흔한 실패).**
+GUI 는 생성자에서 `ResolveSkillRoot()` 를 **`SessionLog.Create` 보다 먼저** 부르고, `App.xaml.cs` 에는
+예외 핸들러가 없다. 즉 **스킬 루트를 못 찾아 던지는 순간에는 세션 로그 파일이 아직 열리기 전**이라
+`%LOCALAPPDATA%\SparrowRunner\logs\` 에 아무것도 안 생긴다 — 창이 안 뜨고 조용히 끝난 것처럼 보인다.
+그때 수집할 것:
+
+1. **레포 트리에 이 세 파일이 모두 있는지** — `SKILL.md`, `tools\Run-SparrowRunnerGui.cmd`,
+   `tools\_internal\SparrowSyntaxFix\Run-SparrowSyntaxFix.ps1`. `ResolveSkillRoot()` 는 exe 위치에서
+   위로 올라가며 **셋을 동시에** 갖춘 폴더를 찾는다. 하나라도 없으면 실패한다.
+2. **exe 의 실제 경로** — 반입할 때 `publish\` 폴더만 따로 떼어냈다면 위 세 파일이 상위에 없어 반드시 실패한다.
+3. **콘솔에서 직접 기동한 출력** — `tools\Run-SparrowRunnerGui.cmd` 를 `cmd` 창에서 실행하면
+   예외 메시지가 콘솔에 보인다(로그 파일에는 없다).
+4. Windows **이벤트 뷰어 → Windows 로그 → 응용 프로그램**의 .NET Runtime 오류 항목.
 
 이 GUI 는 설치되지 않는 커스텀 exe 라 OS 자동화 허용목록에 올릴 수 없다 = **외부에서 스크린샷을 찍을 수 없다.**
-그래서 앱이 **스스로 자기 창을 PNG 로 렌더**한다(`--screenshot-dir <DIR>` 를 줄 때만 활성).
-자세한 내용은 [docs/usage.md](docs/usage.md#4-창-스냅샷--uia-stampshotsiteri순번-지점-타임스탬프png).
+그래서 앱이 **스스로 자기 창을 PNG 로 렌더**한다 — **`--screenshot-dir <DIR>` 를 줄 때만 활성이고, 안 주면 기능 전체가 꺼진다.**
+자세한 내용은 [docs/usage.md](docs/usage.md#4-창-스냅샷).
 
 ## 문서 지도
 
