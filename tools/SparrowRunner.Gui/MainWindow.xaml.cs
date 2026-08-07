@@ -63,6 +63,11 @@ namespace SparrowRunner.Gui
         private const string CommitNotice = "규칙별 커밋 생성 (규칙 하나 = 커밋 하나, 규칙 단위 롤백 가능)";
         private const string CommitDoneSuffix = "개 파일 수정됨 — 규칙별로 커밋했습니다. git log 로 확인하세요.";
 
+        // [규칙별 커밋 생성] 툴팁. git 아닌 대상에서는 "왜 잠겼는지"를 그 자리에서 말한다(XAML 이 아니라 여기가 단일 진실).
+        private const string CommitToolTip = "켜면 규칙마다 커밋을 만들어 규칙 단위로 되돌릴 수 있습니다. 끄면 파일만 수정하고 커밋은 직접 하십시오.";
+        private const string CommitNoGitToolTip = "대상 폴더가 git 저장소가 아니라 규칙별 커밋을 만들 수 없습니다. "
+            + "위 안내의 [git 저장소 만들기]로 기준 커밋을 만들거나, 백업·다른 버전관리(SVN 등)로 복원 수단을 확보하세요.";
+
         /// <summary>실행 모드 안내(요약바·툴팁). 규칙별 커밋 체크 상태에 따라 갈린다.</summary>
         private string ModeNotice => CommitCheck?.IsChecked == true ? CommitNotice : NoCommitNotice;
 
@@ -106,6 +111,10 @@ namespace SparrowRunner.Gui
         private Process? _currentProcess;
         private string? _lastXlsOutputDir;
         private SourceScope? _currentScope;
+
+        // 대상 루트가 git 저장소가 아니라서 [규칙별 커밋 생성]을 잠근 상태인가. UpdateGitState 가 유일한 기록자다.
+        // 실행 버튼은 이 값과 무관하다 — git 이 없어도 실행은 허용한다(사내 SVN 사용처).
+        private bool _commitBlockedByGit;
 
         // XLS 분리 대분류의 범위 트리(로컬 소스 스캔이 아니라 xls 검출 경로로 만든다).
         private XlsScope? _currentXlsScope;
@@ -158,6 +167,7 @@ namespace SparrowRunner.Gui
             ShowRuleInfo(nameof(ASObjectVarSafe));
             Loaded += async (_, _) =>
             {
+                UpdateGitState();   // 커밋 체크박스 툴팁/활성 상태의 첫 확정(UpdateRunButtonForMode 보다 먼저)
                 UpdateRunButtonForMode();
                 UpdateSummary();
                 ApplyStartupXlsPrefill();
@@ -284,7 +294,9 @@ namespace SparrowRunner.Gui
             ActiveMode mode = CurrentMode();
             bool commitApplies = !xls;
             CommitCheck.Visibility = commitApplies ? Visibility.Visible : Visibility.Collapsed;
-            CommitCheck.IsEnabled = commitApplies && _cts == null;
+            // git 아닌 대상에서는 커밋 옵션만 잠근다(_commitBlockedByGit). 실행 버튼은 아래 switch 에서
+            // 이 값을 보지 않는다 — 되돌릴 수단이 없다는 경고는 하되 실행 자체는 막지 않는다.
+            CommitCheck.IsEnabled = commitApplies && _cts == null && !_commitBlockedByGit;
 
             switch (mode)
             {
@@ -831,6 +843,8 @@ namespace SparrowRunner.Gui
             if (!IsLoaded && !showErrors) return;
 
             string target = TargetPathBox.Text.Trim().Trim('"');
+            // 대상 루트가 정해지는 지점 = git 여부를 다시 판정할 지점.
+            UpdateGitState();
             if (string.IsNullOrWhiteSpace(target) || (!File.Exists(target) && !Directory.Exists(target)))
             {
                 _currentScope = null;
@@ -892,6 +906,7 @@ namespace SparrowRunner.Gui
 
         private async Task<SourceScope> EnsureScopeAsync(string target)
         {
+            UpdateGitState();   // 실행 직전에도 대상 루트 기준으로 다시 판정한다(경로가 그 사이 바뀌었을 수 있다)
             string expectedRoot = ResolveTargetRoot(target);
             if (_currentScope != null && SamePath(_currentScope.RootPath, expectedRoot))
             {
@@ -912,6 +927,170 @@ namespace SparrowRunner.Gui
                 Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
                 Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ===== git 게이트 =====
+        //
+        // 자동수정은 소스 파일을 실제로 고친다. git 이 없으면 되돌릴 수단이 없는데, 예전에는 그 상태로 -Commit 을
+        // 넘겨 "파일은 이미 고쳐졌는데 커밋만 실패" + "git 락 재시도 실패"라는 오진까지 나왔다(실측).
+        // 그래서 대상 루트가 정해질 때마다 git 여부를 판정해 커밋 옵션만 잠그고 조치를 안내한다.
+        // 실행 버튼은 건드리지 않는다 — 사내에 SVN 사용처가 있어 git 없다고 차단하면 그쪽이 도구를 못 쓴다.
+
+        /// <summary>
+        /// 루트에서 위로 올라가며 <c>.git</c> 을 찾는다(= git 자신의 판정). 하위 폴더를 골라도 상위가 저장소면 git 이다.
+        /// worktree/submodule 은 <c>.git</c> 이 파일이므로 디렉토리·파일 둘 다 인정한다. 찾으면 그 저장소 루트, 없으면 null.
+        /// </summary>
+        private static string? FindGitRepositoryRoot(string startPath)
+        {
+            try
+            {
+                DirectoryInfo? dir = new DirectoryInfo(Path.GetFullPath(startPath));
+                for (int depth = 0; dir != null && depth < 64; depth++, dir = dir.Parent)
+                {
+                    string marker = Path.Combine(dir.FullName, ".git");
+                    if (Directory.Exists(marker) || File.Exists(marker)) return dir.FullName;
+                }
+            }
+            catch (ArgumentException) { }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            catch (NotSupportedException) { }
+            return null;
+        }
+
+        /// <summary>대상 루트의 git 상태를 다시 판정해 커밋 옵션과 안내를 맞춘다(범위 탐색 시점마다 호출).</summary>
+        private void UpdateGitState()
+        {
+            string target = TargetPathBox.Text.Trim().Trim('"');
+            bool hasTarget = !string.IsNullOrWhiteSpace(target) && (File.Exists(target) || Directory.Exists(target));
+            // 대상이 아직 없으면 잠그지 않는다(고르기 전부터 옵션이 죽어 있으면 이유를 알 수 없다).
+            string root = hasTarget ? ResolveTargetRoot(target) : "";
+            _commitBlockedByGit = hasTarget && FindGitRepositoryRoot(root) == null;
+
+            if (_commitBlockedByGit)
+            {
+                GitNoticeText.Text = "이 폴더는 git 저장소가 아닙니다 (" + root + "). 자동수정은 소스 파일을 실제로 고치는데 "
+                    + "되돌릴 수단이 없습니다. [git 저장소 만들기]로 기준 커밋을 남기거나, 백업·다른 버전관리(SVN 등)로 "
+                    + "복원 수단을 확보한 뒤 실행하세요. 실행은 막지 않습니다 — [규칙별 커밋 생성]만 꺼 둡니다.";
+                GitNoticeBox.Visibility = Visibility.Visible;
+                if (CommitCheck.IsChecked == true) CommitCheck.IsChecked = false;
+            }
+            else
+            {
+                GitNoticeBox.Visibility = Visibility.Collapsed;
+            }
+
+            CommitCheck.ToolTip = _commitBlockedByGit ? CommitNoGitToolTip : CommitToolTip;
+            UpdateRunButtonForMode();
+        }
+
+        private async void InitGitButton_Click(object sender, RoutedEventArgs e)
+        {
+            string target = TargetPathBox.Text.Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(target) || (!File.Exists(target) && !Directory.Exists(target)))
+            {
+                MessageBox.Show(this, "대상 .sln/.csproj 또는 소스 폴더를 먼저 선택하세요.", "git 저장소 만들기",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string root = ResolveTargetRoot(target);
+            MessageBoxResult confirm = MessageBox.Show(this,
+                "'" + root + "' 에 git 저장소를 만들까요?" + Environment.NewLine
+                + "git init → git add -A → git commit -m \"baseline\" 을 실행해 지금 상태를 기준 커밋으로 남깁니다."
+                + Environment.NewLine + "이후 자동수정 결과를 git diff 로 검토하고 되돌릴 수 있습니다.",
+                "git 저장소 만들기", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            InitGitButton.IsEnabled = false;
+            try
+            {
+                AppendLog("");
+                AppendLog(">>> git 저장소 만들기: " + root);
+                IReadOnlyList<string> lines = await Task.Run(() => InitGitRepository(root));
+                foreach (string line in lines) AppendLog(line);
+            }
+            catch (Exception ex)
+            {
+                AppendLog("git 저장소 만들기 실패: " + ex.Message);
+            }
+            finally
+            {
+                InitGitButton.IsEnabled = true;
+                // 성공했으면 여기서 다시 판정되어 커밋 체크박스가 열리고 안내가 사라진다. 실패면 사유는 위 로그에 남는다.
+                UpdateGitState();
+            }
+        }
+
+        /// <summary>git init → add -A → commit 을 순서대로 실행하고, 각 단계의 종료코드·출력을 로그 줄로 돌려준다.</summary>
+        private static IReadOnlyList<string> InitGitRepository(string root)
+        {
+            var log = new List<string>();
+            (string Label, string[] Args)[] steps =
+            {
+                ("git init", new[] { "init" }),
+                ("git add -A", new[] { "add", "-A" }),
+                ("git commit -m \"baseline\"", new[] { "commit", "-m", "baseline" }),
+            };
+
+            foreach ((string label, string[] args) in steps)
+            {
+                (int exitCode, string output) = RunGit(root, args);
+                log.Add("  " + label + " → exit=" + exitCode);
+                foreach (string raw in output.Split('\n'))
+                {
+                    string line = raw.TrimEnd('\r');
+                    if (line.Length > 0) log.Add("    | " + line);
+                }
+                if (exitCode != 0)
+                {
+                    log.Add("  중단: " + label + " 실패 — 위 사유를 확인하세요(git 미설치/PATH · user.name/user.email 미설정 등).");
+                    return log;
+                }
+            }
+
+            log.Add("  완료: 기준 커밋(baseline)을 만들었습니다. 이제 [규칙별 커밋 생성]을 켤 수 있습니다.");
+            return log;
+        }
+
+        /// <summary>git 한 번 실행. 출력은 전부 회수해 로그로만 흘린다(콘솔/화면에 usage 도움말이 새지 않는다).</summary>
+        private static (int ExitCode, string Output) RunGit(string workingDirectory, params string[] arguments)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = new UTF8Encoding(false),
+                StandardErrorEncoding = new UTF8Encoding(false)
+            };
+            foreach (string argument in arguments) psi.ArgumentList.Add(argument);
+            // 자격증명/에디터 프롬프트로 멈추지 않게 한다(GUI 뒤에서 돌므로 사용자가 응답할 수 없다).
+            psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+
+            var output = new StringBuilder();
+            try
+            {
+                using var process = new Process { StartInfo = psi };
+                process.OutputDataReceived += (_, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+                if (!process.Start()) return (-1, "git 프로세스를 시작하지 못했습니다.");
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                process.WaitForExit();
+                return (process.ExitCode, output.ToString());
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                return (-1, "git 을 실행할 수 없습니다(설치·PATH 확인): " + ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return (-1, "git 실행 중 오류: " + ex.Message);
+            }
         }
 
         private List<RunnerJob> BuildJobs(string target, string filesFrom, bool runCodeRule, bool runComment)

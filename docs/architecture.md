@@ -343,8 +343,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전�
 
 | 영역 | 내용 |
 |---|---|
-| `.sln` 파싱 | GUI 의 프로젝트 트리는 `.sln` 안의 일반 C# 프로젝트 라인을 기준으로 만든다. **Solution Folder / Shared Project / 특수 SDK 포맷은 미지원** — 필요하면 `SourceScopeDiscovery` 를 확장한다. |
-| 프로젝트 중복 | 같은 물리 폴더를 여러 `.csproj` 가 참조하면 트리에 파일이 중복 표시될 수 있다. 선택 manifest 는 중복을 제거하므로 실행은 중복되지 않는다. |
+| 범위 트리 = 폴더 구조 | GUI 의 [코드 자동수정] 범위 트리는 **`.sln` 을 파싱하지 않는다.** `.sln`/`.csproj` 를 받으면 **부모 폴더**를, 폴더를 받으면 그 폴더를 루트로 잡고 폴더 구조 그대로 트리를 만든다 — 러너의 `Split-Path -Parent` 와 **같은 규칙**이라 GUI 와 CLI 의 대상 집합이 일치한다. (예전 sln 파싱은 sln 이 선언하지 않은 프로젝트·루트 레벨 `.cs`·느슨한 폴더를 트리에서 통째로 빠뜨렸고, GUI 는 체크된 파일만 `--files-from` 으로 넘기므로 그 파일들은 영원히 안 고쳐졌다.) 어느 폴더를 대상으로 삼을지는 **사용자가 정한다** — 루트를 넓게 잡으면 그만큼 넓게 스캔한다. |
+| 범위가 넓어질 수 있음 | 위 규칙의 대가로, `.sln` 옆에 무관한 폴더가 있으면 그것도 트리에 들어온다. 대상 경로를 좁히거나 트리에서 체크를 풀어 조정한다(제외 규칙 `bin`/`obj`/`.git`/`.vs`/`packages` + 생성 파일은 항상 적용된다). |
 | git 버전 | 러너의 작업범위 격리는 `git commit --only --pathspec-from-file --pathspec-file-nul` 에 의존한다. 이 조합은 **git 2.25 이상**에서 쓸 수 있고, **2.45.1 에서 `-Commit`·게이트 테스트 전부 통과를 실측**했다. 그보다 오래된 git 은 지원 여부 확인 필요. |
 | [XLS 분리] basename 매칭 | Tier 3 는 **의도적으로 보수적**이다. xls `경로` 가 비어 있고 동명 파일이 여럿이면 추측하지 않고 제외한다. |
 | 스캔 접근 실패 | 권한 등으로 못 읽은 디렉터리는 아직 UI 경고로 표시하지 않는다. 필요하면 `SourceScopeDiscovery` 에 skipped count/message 를 추가한다. |

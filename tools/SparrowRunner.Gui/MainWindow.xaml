@@ -221,6 +221,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <!-- git 미구축 안내(기본 숨김). 대상 루트가 git 저장소가 아닐 때만 펼쳐진다. -->
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -250,7 +252,27 @@
                         <Button x:Name="RefreshScopeButton" Grid.Column="4" Content="새로고침" Margin="8,0,0,0" Click="RefreshScopeButton_Click"/>
                     </Grid>
 
-                    <Grid Grid.Row="2">
+                    <!-- git 미구축 안내. 자동수정은 소스를 실제로 고치는데 git 이 없으면 되돌릴 수단이 없다.
+                         그래서 [규칙별 커밋 생성]만 잠그고(러너에 -Commit 을 줘도 커밋이 안 되므로) 여기서 이유와
+                         조치를 말한다. 실행 버튼은 절대 막지 않는다 — 사내에 SVN 사용처가 있어 git 없다고
+                         차단하면 그쪽이 도구를 못 쓴다. 문구/표시 여부는 MainWindow.xaml.cs 의 UpdateGitState 가 정한다. -->
+                    <Border x:Name="GitNoticeBox" Grid.Row="2" Visibility="Collapsed"
+                            Background="{StaticResource WarnBgBrush}" BorderBrush="#F2D4A6"
+                            BorderThickness="1" CornerRadius="8" Padding="12,9" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="GitNoticeText" TextWrapping="Wrap" VerticalAlignment="Center"
+                                       Foreground="{StaticResource WarnBrush}" FontSize="12"/>
+                            <Button x:Name="InitGitButton" AutomationProperties.AutomationId="InitGitButton"
+                                    Grid.Column="1" Content="git 저장소 만들기" MinWidth="132"
+                                    Margin="12,0,0,0" VerticalAlignment="Center" Click="InitGitButton_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="3">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="310"/>
                             <ColumnDefinition Width="12"/>
@@ -625,11 +647,12 @@
                     <!-- 규칙별 커밋: 켜면 러너가 규칙 하나를 적용할 때마다 커밋을 만든다(롤백 단위 = 규칙).
                          끄면 파일만 고치고 커밋은 사용자가 git 으로 한다(-NoCommit). [코드 규칙]/[주석·레이아웃] 전용 —
                          [XLS 분리]는 소스를 건드리지 않으므로 숨긴다. -->
+                    <!-- ToolTip 은 코드가 정한다(MainWindow.xaml.cs 의 CommitToolTip / CommitNoGitToolTip) —
+                         git 아닌 대상에서는 "왜 못 켜는지"를 그 자리에서 말해야 하므로 단일 진실을 코드에 둔다. -->
                     <CheckBox x:Name="CommitCheck" AutomationProperties.AutomationId="CommitCheck"
                               Grid.Column="5" Content="규칙별 커밋 생성" IsChecked="False"
                               Margin="16,0,0,0" VerticalAlignment="Center"
-                              Checked="CommitCheck_Changed" Unchecked="CommitCheck_Changed"
-                              ToolTip="켜면 규칙마다 커밋을 만들어 규칙 단위로 되돌릴 수 있습니다. 끄면 파일만 수정하고 커밋은 직접 하십시오."/>
+                              Checked="CommitCheck_Changed" Unchecked="CommitCheck_Changed"/>
                     <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusText" Grid.Column="6" Text="대기 중"
                                VerticalAlignment="Center" Foreground="{StaticResource TextTertiaryBrush}"/>
                 </Grid>

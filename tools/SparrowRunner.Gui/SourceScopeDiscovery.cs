@@ -1,8 +1,19 @@
+// 작업 범위 트리 = 대상 루트의 "폴더 구조 그대로". 솔루션(.sln)을 파싱하지 않는다.
+//
+// 왜 sln 파싱을 걷어냈나(실측):
+//   러너는 .sln/.csproj 를 받으면 Split-Path -Parent 로 부모 폴더를 소스 루트로 삼아 그 아래 *.cs 를 전부 훑는다
+//   (Run-SparrowSyntaxFix.ps1 / Run-SparrowCommentFix.ps1). 즉 실제 수정 동작에 sln 은 아무 역할이 없다.
+//   반면 예전 GUI 는 sln 이 선언한 프로젝트 폴더 아래만 트리에 담았다. 그래서 sln 에 없는 프로젝트·루트 레벨
+//   .cs·느슨한 폴더의 .cs 가 트리에 아예 안 보였고, GUI 는 체크된 파일만 --files-from 으로 넘기므로
+//   "트리에 안 보이면 영원히 안 고쳐지는" 커버리지 구멍이 됐다.
+//   이제 GUI 도 러너와 같은 규칙(부모 폴더 = 루트)을 쓰므로 두 쪽의 대상 집합이 일치한다.
+//
+// 제외는 종전 그대로다: bin/obj/.git/.vs/packages 디렉토리 + 생성 파일(이름 규칙 · 자동생성 헤더 주석).
+// (헤더 주석에 자동생성 표식 문자열 자체를 적지 말 것 — Roslyn 이 이 파일을 생성 코드로 오인해 CS8669 가 난다.)
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -45,12 +56,6 @@ namespace SparrowRunner.Gui
         private static SourceScope Discover(string targetPath, bool includeGenerated, CancellationToken cancellationToken)
         {
             string targetFull = Path.GetFullPath(targetPath.Trim().Trim('"'));
-            if (File.Exists(targetFull) && targetFull.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
-            {
-                SourceScope? solutionScope = DiscoverSolution(targetFull, includeGenerated, cancellationToken);
-                if (solutionScope != null) return solutionScope;
-            }
-
             if (File.Exists(targetFull) && targetFull.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
             {
                 string fileRoot = Path.GetDirectoryName(targetFull) ?? Environment.CurrentDirectory;
@@ -66,6 +71,8 @@ namespace SparrowRunner.Gui
                 return new SourceScope(fileRoot, rootNode, totalFiles: 1, excludedFiles: 1);
             }
 
+            // .sln/.csproj 등 파일을 받으면 그 '부모 폴더'가 루트다 — 러너의 Split-Path -Parent 와 같은 규칙.
+            // 폴더를 받으면 그대로 루트. 어느 폴더를 고를지는 사용자 몫이며 여기서 더 좁히지 않는다.
             string rootPath = File.Exists(targetFull)
                 ? Path.GetDirectoryName(targetFull) ?? Environment.CurrentDirectory
                 : targetFull;
@@ -80,67 +87,6 @@ namespace SparrowRunner.Gui
             Populate(rootInfo, root, includeGenerated, ref total, ref excluded, cancellationToken);
             root.RefreshFromChildren();
             return new SourceScope(rootInfo.FullName, root, total, excluded);
-        }
-
-        private static SourceScope? DiscoverSolution(string solutionPath, bool includeGenerated, CancellationToken cancellationToken)
-        {
-            string solutionDir = Path.GetDirectoryName(solutionPath) ?? Environment.CurrentDirectory;
-            var projects = ReadSolutionProjects(solutionPath)
-                .Select(p => new
-                {
-                    p.Name,
-                    ProjectPath = Path.GetFullPath(Path.Combine(solutionDir, p.RelativePath))
-                })
-                .Where(p => File.Exists(p.ProjectPath))
-                .Select(p => new
-                {
-                    p.Name,
-                    p.ProjectPath,
-                    ProjectDir = Path.GetDirectoryName(p.ProjectPath) ?? solutionDir
-                })
-                .GroupBy(p => p.ProjectPath, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (projects.Count == 0) return null;
-
-            var root = new SourceScopeNode(Path.GetFileNameWithoutExtension(solutionPath), solutionDir, isFile: false)
-            {
-                IsExpanded = true
-            };
-            int total = 0;
-            int excluded = 0;
-            foreach (var project in projects)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!Directory.Exists(project.ProjectDir)) continue;
-
-                var projectNode = new SourceScopeNode(project.Name, project.ProjectDir, isFile: false, root);
-                Populate(new DirectoryInfo(project.ProjectDir), projectNode, includeGenerated, ref total, ref excluded, cancellationToken);
-                if (!projectNode.EnumerateFiles().Any()) continue;
-
-                projectNode.RefreshFromChildren();
-                root.Children.Add(projectNode);
-            }
-
-            root.RefreshFromChildren();
-            return new SourceScope(solutionDir, root, total, excluded);
-        }
-
-        private static IEnumerable<(string Name, string RelativePath)> ReadSolutionProjects(string solutionPath)
-        {
-            var rx = new Regex(
-                "^Project\\(\"[^\"]+\"\\)\\s*=\\s*\"(?<name>[^\"]+)\",\\s*\"(?<path>[^\"]+\\.csproj)\"",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            foreach (string line in File.ReadLines(solutionPath))
-            {
-                Match match = rx.Match(line);
-                if (!match.Success) continue;
-                string relativePath = match.Groups["path"].Value;
-                if (Path.IsPathRooted(relativePath)) continue;
-                yield return (match.Groups["name"].Value, relativePath);
-            }
         }
 
         private static void Populate(DirectoryInfo directory, SourceScopeNode node, bool includeGenerated, ref int total, ref int excluded, CancellationToken cancellationToken)

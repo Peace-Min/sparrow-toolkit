@@ -173,6 +173,21 @@ $slnFull = (Resolve-Path -LiteralPath $Solution).Path
 # .sln 파일이면 그 폴더, 폴더면 그대로 = 소스 루트(툴이 .cs 재귀 + 생성/백업 제외)
 $root = if (Test-Path -LiteralPath $slnFull -PathType Leaf) { Split-Path -Parent $slnFull } else { $slnFull }
 
+# 대상 루트가 git 저장소인가 = git 자신의 판정(rev-parse --is-inside-work-tree). 하위 폴더를 골라도 상위가
+# 저장소면 git 이다. git 출력(usage/fatal)은 전부 삼킨다 — 도움말이 콘솔에 쏟아지면 진짜 사유가 묻힌다.
+# 이 값 하나로 (1) 작업트리 오염 경고 (2) -Commit 게이트 를 모두 판정한다.
+function Test-GitRepository {
+    param([Parameter(Mandatory)][string]$Root)
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return $false }
+    # 네이티브 stderr가 EAP=Stop에서 종료오류로 throw되는 것을 막는다(함수 스코프 변수라 호출자에 영향 없음).
+    $ErrorActionPreference = 'Continue'
+    $out = @(& git -C $Root rev-parse --is-inside-work-tree 2>$null)
+    $code = $LASTEXITCODE
+    return (($code -eq 0) -and ((($out -join '')).Trim() -eq 'true'))
+}
+$gitAvailable = [bool](Get-Command git -ErrorAction SilentlyContinue)
+$isGitRepo = Test-GitRepository -Root $root
+
 # 실행 로그
 if (-not $LogDir) { $LogDir = (Get-Location).Path }
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
@@ -234,22 +249,20 @@ $tool = Resolve-Tool
 Write-Host "툴            : $($tool.path)"
 
 # 작업트리 오염 경고(자동수정 diff 격리를 위해). native(git) stderr가 EAP=Stop에서 throw되는 것을 막기
-# 위해 이 구간만 Continue. git 없음/비-git 폴더(exit!=0)면 조용히 건너뜀(경고는 편의 기능일 뿐).
-if (-not $DryRun) {
+# 위해 이 구간만 Continue. 비-git 폴더/git 없음이면 통째로 건너뜀(경고는 편의 기능일 뿐).
+# 주의: git 이 아니어도 여기서 막지 않는다 — dirty 여부는 경고일 뿐이고, -Commit 게이트는 아래 1b-2 가 담당한다.
+if (-not $DryRun -and $isGitRepo) {
     $ErrorActionPreference = 'Continue'
     $dirty = @(& git -C $root status --porcelain 2>$null)
-    $gitCode = $LASTEXITCODE
+    # 커밋마다 git 자동 gc(재패킹)가 .git pack의 .idx를 unlink하려다 백신/인덱서와 충돌해
+    # "Unlink of file ...pack-*.idx failed. Should I try again?" 가 나는 것을 원천 차단.
+    # 대상 repo 로컬 설정(1회), 다른 repo엔 영향 없음.
+    & git -C $root config gc.auto 0 2>&1 | Out-Null
+    & git -C $root config gc.autoDetach false 2>&1 | Out-Null
+    & git -C $root config core.fscache true 2>&1 | Out-Null
     $ErrorActionPreference = 'Stop'
-    if ($gitCode -eq 0) {
-        # 커밋마다 git 자동 gc(재패킹)가 .git pack의 .idx를 unlink하려다 백신/인덱서와 충돌해
-        # "Unlink of file ...pack-*.idx failed. Should I try again?" 가 나는 것을 원천 차단.
-        # 대상 repo 로컬 설정(1회), 다른 repo엔 영향 없음.
-        & git -C $root config gc.auto 0 2>&1 | Out-Null
-        & git -C $root config gc.autoDetach false 2>&1 | Out-Null
-        & git -C $root config core.fscache true 2>&1 | Out-Null
-        if ($dirty.Count -gt 0) {
-            Write-Warning "작업트리에 미커밋 변경이 있습니다($($dirty.Count)개). 자동수정 diff와 섞일 수 있으니 깨끗한 상태에서 권장."
-        }
+    if ($dirty.Count -gt 0) {
+        Write-Warning "작업트리에 미커밋 변경이 있습니다($($dirty.Count)개). 자동수정 diff와 섞일 수 있으니 깨끗한 상태에서 권장."
     }
 }
 
@@ -329,7 +342,7 @@ function Test-GitTargetChanged {
         }
         return $false
     }
-    $csDirty = @(& git -C $Root status --porcelain -- '*.cs') | Where-Object { $_ }
+    $csDirty = @(& git -C $Root status --porcelain -- '*.cs' 2>$null) | Where-Object { $_ }
     return $csDirty.Count -gt 0
 }
 
@@ -379,13 +392,13 @@ function Invoke-GitCommitStep {
     }
 
     & git -C $Root add -- '*.cs' 2>&1 | Out-Null
-    & git -C $Root diff --cached --quiet
+    & git -C $Root diff --cached --quiet 2>$null
     if ($LASTEXITCODE -eq 0) { return 'nochange' }
     for ($attempt = 1; $attempt -le 5; $attempt++) {
         & git -C $Root commit -q -m $Message 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) { return 'committed' }
         # 커밋이 실제로는 성공(스테이징 소진)했는지 확인 - 그러면 성공 처리.
-        & git -C $Root diff --cached --quiet
+        & git -C $Root diff --cached --quiet 2>$null
         if ($LASTEXITCODE -eq 0) { return 'committed' }
         # 전형적 일시 락 - 점증 백오프 후 재시도. 혹시 남은 index.lock 은 정리.
         Start-Sleep -Milliseconds (400 * $attempt)
@@ -432,6 +445,27 @@ if (-not $Commit -and -not $DryRun -and -not $NoCommit) {
 }
 elseif ($NoCommit) {
     Write-Host "-> 파일만 수정(커밋 안 함). (-NoCommit)"
+}
+
+# 1b-2) git 게이트: -Commit 인데 대상 루트가 git 저장소가 아니면, 규칙을 돌리기 '전에' 정확한 사유를 알리고
+# 커밋 단계를 통째로 건너뛴다(파일 수정은 그대로 진행). 예전에는 이 상태로 커밋을 시도해서
+#   (1) git 도움말/에러가 콘솔에 쏟아지고
+#   (2) "커밋 실패(git 락 5회 재시도 후에도)" 라는 오진이 나왔다 — 진짜 원인은 '저장소가 아님'이었다.
+# 여기서 $Commit 을 끄므로 아래 커밋 경로(Invoke-GitCommitStep)는 아예 호출되지 않는다.
+$commitSkipReason = $null
+if ($Commit -and -not $isGitRepo) {
+    $commitSkipReason = if ($gitAvailable) {
+        "대상 루트가 git 저장소가 아닙니다(상위 폴더에도 .git 없음): $root"
+    }
+    else {
+        "git 이 설치되어 있지 않거나 PATH 에 없습니다: $root"
+    }
+    $Commit = $false
+    Write-Host ""
+    Write-Warning "커밋하지 않습니다 - $commitSkipReason"
+    Write-Host "  파일 수정은 그대로 진행합니다. 되돌릴 수단이 없으니 백업 또는 다른 버전관리(SVN 등)로 복원 수단을 먼저 확보하세요."
+    Write-Host "  git 으로 되돌리려면: git init -> git add -A -> git commit -m baseline 을 한 뒤 -Commit 으로 다시 실행하세요."
+    Add-Content -LiteralPath $logPath -Value "[GIT] commit skipped: $commitSkipReason"
 }
 
 # 1c) 컴파일 게이트 안내. -Commit인데 -VerifyCmd가 없으면 게이트가 없다는 걸 분명히 알린다(커밋 후 전체 빌드 필수).
@@ -513,6 +547,7 @@ foreach ($r in $Rules) {
             'failed'    { Write-Warning "  커밋 실패(git 락 5회 재시도 후에도) - 파일 수정은 유지됨. 나중에 수동 커밋 가능." }
         }
     }
+    elseif ($commitSkipReason) { Write-Host "  커밋      : 건너뜀 - $commitSkipReason (파일만 수정됨)" }
     elseif ($NoCommit) { Write-Host "  커밋      : -NoCommit -> 커밋 안 함 (파일만 수정됨)" }
     else { Write-Host "  커밋      : -Commit 미지정 -> 커밋 안 함 (파일만 수정됨)" }
     if ($backupDir) { Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue }
@@ -520,6 +555,10 @@ foreach ($r in $Rules) {
 
 Write-Host ""
 if (-not $DryRun) { Write-Host "총 수정 건수(적용된 규칙 합): $grand" }
+if ($commitSkipReason) {
+    Write-Host "커밋: 하지 않음 - $commitSkipReason"
+    Write-Host "      (파일은 이미 수정되었습니다. 복원 수단을 확보한 뒤 재실행하세요.)"
+}
 if ($gateActive -and $gateReverted -gt 0) { Write-Host "게이트 revert(검증 실패로 되돌리고 커밋 skip한 규칙): $gateReverted" }
 if ($failed) { Write-Host "일부 규칙 미완 -> 로그 확인." }
 Write-Host "전체 로그: $logPath"
