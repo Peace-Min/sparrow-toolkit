@@ -24,7 +24,7 @@
 
     [보안] stdout 은 공유물이다(tests\_logs\validate-*.log → CONTRIBUTING 이 실패 신고 시 첨부를 지시,
     레포는 public). 그래서 xls 경로/파일명뿐 아니라 xls 에서 뽑아낸 '사내 폴더/파일 경로'도 찍지 않는다 —
-    'OSTES\Service' / 'OSTES\View\Result_MapView.xaml.cs' 같은 단정 메시지는 그 자체가 사내 프로젝트 구조
+    'MyApp\Service' / 'MyApp\View\SomeView.xaml.cs' 같은 단정 메시지는 그 자체가 사내 프로젝트 구조
     노출이다. 대신 이 실행 안에서만 유효한 익명 라벨(폴더 #1, 파일 #1)로 부르고, 기대/실 건수는 그대로 찍는다
     (무엇을 검증하는지는 불변 — 판정 로직·건수는 손대지 않았다).
     라벨 ↔ 실제 경로 대응표는 로컬 파일(tests\_logs\scopeloop-labels-<stamp>.txt, .gitignore 대상)에만 쓰고,
