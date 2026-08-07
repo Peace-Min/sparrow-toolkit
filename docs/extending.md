@@ -293,7 +293,7 @@ C# 러너에 `.cpp` 가 넘어간다. 갈래별로 확장자 집합을 갈라 �
 | 7 | `tests/gui-uia-tests.ps1` | `$SUB_TABS = @('코드 규칙', '주석·레이아웃')` 를 새 탭 포함으로 갱신 + 하위 탭 개수 단정 갱신 |
 | **8** | `MainWindow.xaml` 의 **경고 배너** | `SectionFixTab` 바로 안, `Grid.Row="0"` 의 주황 `Border` — **`RulesTabs` 바깥**이다. 즉 새 C/C++ 하위 탭을 골라도 **그대로 떠 있다.** 문구가 *"Roslyn C# 파서로 코드를 재작성하므로 C/C++ 등 다른 언어에는 쓸 수 없습니다. C/C++ 결과는 위의 [XLS 분리] 대분류를 사용하세요."* 라서, 고치지 않으면 **제품이 사용자에게 거짓말을 한다.** 선택한 하위 탭에 따라 문구를 바꾸거나 배너를 `RulesTabs` 안으로 옮긴다 |
 | **9** | `MainWindow.xaml.cs` `UpdateSummary()` 의 **`SectionHintText`** | 삼항의 **else 쪽**에 `"코드 자동수정: C# 전용입니다. …"` 가 묻혀 있다. `switch (mode)` 케이스만 추가하고 이 줄을 지나치기 매우 쉽다 — 새 갈래에서도 "C# 전용" 이 그대로 뜬다 |
-| **10** | `MainWindow.xaml.cs` `BrowseFileButton_Click` 의 **파일 대화상자 필터** | `Filter = "Solution/Project (*.sln;*.csproj)\|*.sln;*.csproj\|모든 파일 (*.*)\|*.*"` — **`.vcxproj` 를 고를 수 없다.** [2.2 의 인자 표](#22-핵심-러너-계약만-지키면-gui-에-붙는다)는 `.vcxproj` 를 대상으로 명시하므로, 여기를 안 고치면 문서와 UI 가 어긋난다(사용자는 "모든 파일" 로 우회해야 한다) |
+| **10** | `MainWindow.xaml.cs` `BrowseFolderButton_Click` 의 **폴더 대화상자** | 대상 선택은 **폴더 하나**뿐이다(예전의 `[파일 선택]` 은 제거 — `.sln` 을 골라도 부모 폴더로 환원돼 결과가 같았다). 새 언어를 붙일 때 **여기서 손댈 것은 없다** — 폴더 기준이라 언어 무관이다. 확장자 집합은 아래 §2.2.2 의 열거 지점에서 넓힌다 |
 
 여기에 더해:
 

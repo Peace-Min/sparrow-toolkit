@@ -362,20 +362,10 @@ namespace SparrowRunner.Gui
             UpdateSummary();
         }
 
-        private void BrowseFileButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new OpenFileDialog
-            {
-                Title = "솔루션 또는 프로젝트 선택",
-                Filter = "Solution/Project (*.sln;*.csproj)|*.sln;*.csproj|모든 파일 (*.*)|*.*",
-                CheckFileExists = true
-            };
-            if (dlg.ShowDialog(this) == true)
-            {
-                TargetPathBox.Text = dlg.FileName;
-            }
-        }
-
+        // 대상 선택은 '폴더' 하나뿐이다. 예전의 [파일 선택](.sln/.csproj 다이얼로그)은 제거했다 —
+        // 어떤 파일을 고르든 ResolveTargetRoot 가 부모 폴더로 환원하므로 [폴더 선택]과 결과가 같았고,
+        // 두 버튼이 "sln 을 골라야 하는가"라는 오해만 만들었다.
+        // 경로를 직접 입력/붙여넣는 경로는 그대로라 .sln/.csproj 문자열도 계속 받아들인다.
         private void BrowseFolderButton_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFolderDialog
@@ -384,10 +374,27 @@ namespace SparrowRunner.Gui
             };
             string current = TargetPathBox.Text.Trim();
             if (Directory.Exists(current)) dlg.InitialDirectory = current;
+            else
+            {
+                // .sln/.csproj 를 붙여넣어 둔 상태면 그 부모 폴더에서 고르기 시작한다.
+                string? parent = SafeParentDirectory(current);
+                if (parent != null) dlg.InitialDirectory = parent;
+            }
             if (dlg.ShowDialog(this) == true)
             {
                 TargetPathBox.Text = dlg.FolderName;
             }
+        }
+
+        /// <summary>파일 경로면 그 부모 폴더, 아니면 null. 예외는 삼킨다(경로가 깨져 있어도 UI 가 죽지 않게).</summary>
+        private static string? SafeParentDirectory(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+                return Path.GetDirectoryName(Path.GetFullPath(path));
+            }
+            catch { return null; }
         }
 
         private void BrowseXlsButton_Click(object sender, RoutedEventArgs e)
@@ -1727,7 +1734,6 @@ namespace SparrowRunner.Gui
             if (running) RunButton.IsEnabled = false;
             else UpdateRunButtonForMode();
             StopButton.IsEnabled = running;
-            BrowseFileButton.IsEnabled = !running;
             BrowseFolderButton.IsEnabled = !running;
             RefreshScopeButton.IsEnabled = !running;
             SelectAllScopeButton.IsEnabled = !running;

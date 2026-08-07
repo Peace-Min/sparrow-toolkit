@@ -234,22 +234,25 @@
                         </TextBlock>
                     </Border>
 
+                    <!-- 대상 = 폴더 하나. 예전에는 [파일 선택]/[폴더 선택] 두 버튼이었는데, .sln/.csproj 를 골라도
+                         결국 그 부모 폴더가 소스 루트가 되므로(러너의 Split-Path -Parent 와 동일) 두 버튼이 같은 일을
+                         했다. 선택지를 둘로 보여 준 것이 "sln 을 골라야 하나?" 하는 혼란의 원인이었다 — 하나로 합친다.
+                         경로를 직접 붙여넣는 경우는 여전히 .sln/.csproj 도 받아 부모 폴더로 환원한다. -->
                     <Grid Grid.Row="1" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="대상(.sln/.csproj/폴더)" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="0" Text="대상 폴더" VerticalAlignment="Center"
                                    Margin="0,0,10,0" Style="{StaticResource MutedText}"/>
                         <TextBox x:Name="TargetPathBox" AutomationProperties.AutomationId="TargetPathBox"
                                  Grid.Column="1" Style="{StaticResource InputBox}" TextChanged="TargetPathBox_TextChanged"
-                                 VerticalAlignment="Center"/>
-                        <Button x:Name="BrowseFileButton" Grid.Column="2" Content="파일 선택" Margin="8,0,0,0" Click="BrowseFileButton_Click"/>
-                        <Button x:Name="BrowseFolderButton" Grid.Column="3" Content="폴더 선택" Margin="8,0,0,0" Click="BrowseFolderButton_Click"/>
-                        <Button x:Name="RefreshScopeButton" Grid.Column="4" Content="새로고침" Margin="8,0,0,0" Click="RefreshScopeButton_Click"/>
+                                 VerticalAlignment="Center"
+                                 ToolTip="소스가 있는 폴더를 고릅니다. .sln/.csproj 경로를 붙여넣어도 그 부모 폴더를 대상으로 씁니다."/>
+                        <Button x:Name="BrowseFolderButton" Grid.Column="2" Content="폴더 선택" Margin="8,0,0,0" Click="BrowseFolderButton_Click"/>
+                        <Button x:Name="RefreshScopeButton" Grid.Column="3" Content="새로고침" Margin="8,0,0,0" Click="RefreshScopeButton_Click"/>
                     </Grid>
 
                     <!-- git 미구축 안내. 자동수정은 소스를 실제로 고치는데 git 이 없으면 되돌릴 수단이 없다.
@@ -388,9 +391,12 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
                                     <Grid Grid.Row="0">
+                                        <!-- 우측 요약 열은 MaxWidth 로 상한을 둔다. Width="Auto" 만 두면 긴 대상 경로가
+                                             자기 원본 폭만큼 자리를 차지해(TextTrimming 은 컨테이너가 좁아져야 작동한다)
+                                             좌측 규칙 설명 열이 한 글자 폭으로 짜부러졌다 — 깊은 경로에서 실제로 재현. -->
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*" MinWidth="280"/>
+                                            <ColumnDefinition Width="Auto" MaxWidth="420"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
                                             <TextBlock x:Name="RuleInfoTitle" FontSize="15" FontWeight="SemiBold"
