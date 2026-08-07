@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 <#
     GUI UIA harness for tools\SparrowRunner.Gui — the 대분류 2분할 화면([코드 자동수정 (C#)] / [XLS 분리 (모든 언어)]),
-    the XLS-derived 범위 트리, and the Track C 체커 규칙 관리 model (named rule library + explicit checker
+    the XLS-derived 범위 트리, and the [XLS 분리] 체커 규칙 관리 model (named rule library + explicit checker
     assignments in a SEPARATE window, with NO name-based auto-mapping).
 
     Drives the REAL WPF windows through UI Automation (System.Windows.Automation, an OS API — PS 5.1 attaches to
@@ -9,8 +9,8 @@
     the load-time census the [XLS 분리] 대분류 is auto-selected and the [체커 규칙 관리] window is opened
     automatically with the detected checkers loaded. It then verifies, in order:
 
-      0) 대분류 분할: --trackc-xls 로 기동하면 SectionXlsTab 이 선택되어 있고, 그 화면에는 xls/출력/규칙관리/범위
-         트리가 렌더되지만 A/B 전용 컨트롤(대상 프로젝트 경로 입력 · 로컬 소스 트리)은 아예 없다(오해 방지).
+      0) 대분류 분할: --xls 로 기동하면 SectionXlsTab 이 선택되어 있고, 그 화면에는 xls/출력/규칙관리/범위
+         트리가 렌더되지만 코드 자동수정 전용 컨트롤(대상 프로젝트 경로 입력 · 로컬 소스 트리)은 아예 없다(오해 방지).
       1) 관리창 자동 오픈: the separate "체커 규칙 관리" window is present (found by title in the same process).
       2) 자동매핑 없음(핵심): a rule file NAMED exactly like a checker key (RESOURCE_LEAK.md) sits in the library,
          yet EVERY 체커 매핑 ComboBox shows "— 없음 —" (nothing assigned) and _assignments.json does NOT exist.
@@ -36,21 +36,21 @@
          folder node (ModuleA\core) and re-running exports EXACTLY that folder's items into a second output dir — even
          the SAME checker's items in other folders must not appear (경로 필터이지 체커 필터가 아님을 증명).
          요약(XlsScopeSummary)도 그 선택으로 갱신된다.
-      T) 대분류 전환: SectionFixTab 을 SelectionItemPattern 으로 고르면 A/B 화면(대상 경로 + 로컬 소스 트리 + 규칙
+      T) 대분류 전환: SectionFixTab 을 SelectionItemPattern 으로 고르면 코드 자동수정 화면(대상 경로 + 로컬 소스 트리 + 규칙
          체크박스)이 나타나고, XLS 전용 컨트롤은 사라진다. [코드 자동수정] 화면의 하위 탭은 둘([코드 규칙]/
          [주석·레이아웃])이고 라벨/순서가 정확하다.
-      U) 실사용자 언어 · 옵션 제거 · 커밋 안 함(핵심): 화면은 내부 트랙(A/B/C) 대신 하는 일로 부른다 —
+      U) 실사용자 언어 · 옵션 제거 · 커밋 안 함(핵심): 화면은 내부 분류 대신 하는 일로 부른다 —
          하위 탭은 [코드 규칙]/[주석·레이아웃], 실행 버튼은 '코드 규칙 수정 실행'/'주석·레이아웃 수정 실행',
-         요약바는 '코드 규칙 · 선택 N개'. 두 화면 전체 텍스트(요소 Name + ValuePattern 값)에 'Track A'/'Track B'
-         문구가 하나도 없어야 하고, 제거한 옵션 2종(DryRunCheck/IncludeGeneratedCheck)과 옵션 탭
-         (OptionsTab)은 UIA 트리에 아예 없어야 한다(내부 식별자 TrackATab/TrackBTab 등은 그대로 유지되므로
+         요약바는 '코드 규칙 · 선택 N개'. 두 화면 전체 텍스트(요소 Name + ValuePattern 값)에 내부 식별자
+         ('CodeRuleTab'/'CommentTab')가 하나도 없어야 하고, 제거한 옵션 2종(DryRunCheck/IncludeGeneratedCheck)과 옵션 탭
+         (OptionsTab)은 UIA 트리에 아예 없어야 한다(내부 식별자 CodeRuleTab/CommentTab 등은 그대로 유지되므로
          라벨은 id 로 찾아 Name 을 읽어 확인한다). 규칙별 커밋(CommitCheck)은 롤백 단위이자 러너 컴파일
-         게이트의 전제라 유지한다 — A/B 화면에만 보이고 기본 꺼짐이며, 토글하면 요약이 커밋 모드로 바뀐다.
+         게이트의 전제라 유지한다 — 코드 자동수정 화면에만 보이고 기본 꺼짐이며, 토글하면 요약이 커밋 모드로 바뀐다.
          마지막으로 소스 계약: GUI 는 커밋 체크 상태에 따라 -Commit / -NoCommit 을 넘기고
          (-DryRun/-IncludeGenerated 는 미전달) 실행 후 '…개 파일 수정됨 …' 안내를 출력하며,
          CLI 러너의 -Commit/-NoCommit/-DryRun/-VerifyCmd/-IncludeGenerated 는 전부 살아 있다.
       8) clean 종료 · 실 캐시(references\checkers) 미오염 (--guides-dir 임시 폴더 override, 전후 스냅샷 대조).
-      9) 진단 로그: the GUI wrote a session transcript (with its 시작 헤더) and a machine-readable Track C run
+      9) 진단 로그: the GUI wrote a session transcript (with its 시작 헤더) and a machine-readable [XLS 분리] run
          report whose numbers match what the run actually produced.
       L) 레이아웃 회귀(수치 단정): every key element renders non-degenerate (w>0/h>0/IsOffscreen=false), sits INSIDE
          its window's rectangle (= 잘림 없음), the 규칙 에디터 is at least $MIN_RULE_EDITOR_H tall, 목록/에디터
@@ -70,8 +70,8 @@
                                        assignment saved / after run)
       shots\iter<i>\*.png            — the app's own window renders: automatic (main loaded / manager open / after
                                        run) + one per capture.request (req-main = XLS 분리 화면 / req-manager /
-                                       req-assign-saved / req-xls-scoped = 범위 체크 상태 / req-fix-section = A/B 화면)
-      gui-logs\                      — the app's OWN session transcript + Track C run report for the same run
+                                       req-assign-saved / req-xls-scoped = 범위 체크 상태 / req-fix-section = 코드 자동수정 화면)
+      gui-logs\                      — the app's OWN session transcript + [XLS 분리] run report for the same run
       FAILURE-CONTEXT-iter<i>.txt    — only on failure: the failed checks + a fresh tree dump at that moment
     Only the newest $KEEP_UIA_LOGS run folders are kept (tests\_logs is gitignored).
 
@@ -740,7 +740,7 @@ function Invoke-OneIteration([int]$iter) {
     # NOTE: $out is NOT pre-created — Run creates it.
     $xls = Join-Path $work 'fixture.xls'
     $assignJson = Join-Path $guides '_assignments.json'
-    # 앱 자신의 세션 로그/Track C 리포트도 이 실행의 증거로 함께 수집한다(반복별 폴더).
+    # 앱 자신의 세션 로그/[XLS 분리] 리포트도 이 실행의 증거로 함께 수집한다(반복별 폴더).
     $iterGuiLogDir = Join-Path $guiLogDir ("iter" + $iter)
     New-Item -ItemType Directory -Force -Path $iterGuiLogDir | Out-Null
     # 창 스냅샷도 반복별 폴더로 분리한다(이전 반복의 잔여 capture.request 가 다음 반복을 건드리지 않게).
@@ -764,7 +764,7 @@ function Invoke-OneIteration([int]$iter) {
         # ---- launch GUI: xls/out prefilled + --open-rule-manager (auto-open the manager window) ----
         # --log-dir 로 앱의 세션 로그/실행 리포트를 이 진단 폴더로 유도한다(실 %LOCALAPPDATA% 오염 방지 + 증거 동봉).
         # --screenshot-dir 로 앱이 스스로 자기 창을 PNG 로 렌더하게 한다(자동 지점 + capture.request 요청 캡처).
-        $guiArgs = @('--trackc-xls', $xls, '--trackc-out', $out, '--guides-dir', $guides,
+        $guiArgs = @('--xls', $xls, '--xls-out', $out, '--guides-dir', $guides,
                      '--log-dir', $iterGuiLogDir, '--screenshot-dir', $iterShotDir,
                      '--open-rule-manager')
         $proc = Start-Process -FilePath $exe -ArgumentList $guiArgs -PassThru
@@ -776,7 +776,7 @@ function Invoke-OneIteration([int]$iter) {
         Write-UiaTree $main "iteration $iter · 1단계: 메인창 로드 직후" ("tree-1-main-loaded-iter$iter.txt") | Out-Null
 
         # ================= (0) 대분류 분할: XLS 분리 화면 =================
-        # --trackc-xls 로 기동하면 [XLS 분리] 대분류가 선택된 상태여야 한다. 그리고 그 화면에는 A/B 전용 입력
+        # --xls 로 기동하면 [XLS 분리] 대분류가 선택된 상태여야 한다. 그리고 그 화면에는 코드 자동수정 전용 입력
         # (프로젝트 대상 경로 · 로컬 소스 트리)이 "아예 없어야" 한다 — 보이면 필수 입력처럼 오해된다.
         $sectionTabs = UIA-First $main 'SectionTabs'
         $xlsTab = UIA-First $main 'SectionXlsTab'
@@ -784,20 +784,20 @@ function Invoke-OneIteration([int]$iter) {
         Check "0) 대분류 전환 컨트롤(SectionTabs) + 두 대분류 탭 존재" {
             ($null -ne $sectionTabs) -and ($null -ne $xlsTab) -and ($null -ne $fixTab)
         }
-        Check "0) --trackc-xls 기동 시 [XLS 분리] 대분류가 선택됨" { UIA-IsSelected $xlsTab }
+        Check "0) --xls 기동 시 [XLS 분리] 대분류가 선택됨" { UIA-IsSelected $xlsTab }
         Check "0) [코드 자동수정] 대분류는 선택 안 됨" { -not (UIA-IsSelected $fixTab) }
-        foreach ($xlsId in @('TrackCXlsPathBox', 'TrackCOutputPathBox', 'OpenRuleManagerButton',
-                             'TrackCMappingSummary', 'XlsScopeTree', 'XlsScopeSummary')) {
+        foreach ($xlsId in @('XlsPathBox', 'XlsOutputPathBox', 'OpenRuleManagerButton',
+                             'CheckerMappingSummary', 'XlsScopeTree', 'XlsScopeSummary')) {
             Check "0) XLS 화면에 $xlsId 렌더" { -not (Element-Absent $main $xlsId) }
         }
         Check "0) [핵심] XLS 화면에 프로젝트 대상 경로 입력(TargetPathBox) 없음" { Element-Absent $main 'TargetPathBox' }
         Check "0) XLS 화면에 로컬 소스 범위 트리(ScopeTree) 없음" { Element-Absent $main 'ScopeTree' }
         Check "0) XLS 화면에 코드 규칙 체크박스(ASObjectVarSafe) 없음" { Element-Absent $main 'ASObjectVarSafe' }
-        # (U) 실사용자 언어: 화면 어디에도 내부 트랙 명칭이 노출되지 않는다(내부 식별자/주석은 그대로 유지).
+        # (U) 실사용자 언어: 화면 어디에도 내부 식별자가 노출되지 않는다(코드 안 식별자/주석은 그대로 유지).
         $xlsTexts = @(Get-AllVisibleText $main)
-        $xlsTrackHits = @(Find-TextMatches $xlsTexts 'Track A') + @(Find-TextMatches $xlsTexts 'Track B')
-        Check "U) XLS 화면 텍스트에 'Track A'/'Track B' 문구 없음 (적중 $($xlsTrackHits.Count)개: $($xlsTrackHits -join ' | '))" {
-            $xlsTrackHits.Count -eq 0
+        $xlsInternalIdHits = @(Find-TextMatches $xlsTexts 'CodeRuleTab') + @(Find-TextMatches $xlsTexts 'CommentTab')
+        Check "U) XLS 화면 텍스트에 내부 식별자('CodeRuleTab'/'CommentTab') 없음 (적중 $($xlsInternalIdHits.Count)개: $($xlsInternalIdHits -join ' | '))" {
+            $xlsInternalIdHits.Count -eq 0
         }
 
         # xls 경로에서 만들어진 범위 트리(로컬 소스 스캔 아님): 픽스처의 폴더 + 파일 리프가 전부 있어야 한다.
@@ -908,8 +908,8 @@ function Invoke-OneIteration([int]$iter) {
         }
         # 메인창 쪽 핵심 요소도 같은 기준으로 본다([XLS 분리] 대분류가 선택된 상태).
         foreach ($mainId in @('RunButton', 'SectionTabs', 'SectionFixTab', 'SectionXlsTab',
-                              'TrackCXlsPathBox', 'TrackCOutputPathBox', 'OpenRuleManagerButton',
-                              'TrackCMappingSummary', 'XlsScopeTree', 'XlsScopeSummary', 'XlsScopeCommonPath')) {
+                              'XlsPathBox', 'XlsOutputPathBox', 'OpenRuleManagerButton',
+                              'CheckerMappingSummary', 'XlsScopeTree', 'XlsScopeSummary', 'XlsScopeCommonPath')) {
             Check-IdLayout $main '메인창' $mainId | Out-Null
         }
         # 레이아웃 실패는 관리창이 살아 있는 지금이 가장 좋은 증거 시점이다(창을 닫은 뒤엔 트리를 뜰 수 없다).
@@ -1027,10 +1027,10 @@ function Invoke-OneIteration([int]$iter) {
                 (-not $sessionText.Contains('snapshot 실패'))
             }
         }
-        $reportFiles = @(Get-ChildItem -LiteralPath $iterGuiLogDir -Filter 'trackc-*.json' -File -ErrorAction SilentlyContinue)
-        Check "9) Track C 실행 리포트 생성(trackc-*.json, $($reportFiles.Count)개) + .log 요약 동반" {
+        $reportFiles = @(Get-ChildItem -LiteralPath $iterGuiLogDir -Filter 'xlssplit-*.json' -File -ErrorAction SilentlyContinue)
+        Check "9) [XLS 분리] 실행 리포트 생성(xlssplit-*.json, $($reportFiles.Count)개) + .log 요약 동반" {
             ($reportFiles.Count -ge 1) -and
-            (@(Get-ChildItem -LiteralPath $iterGuiLogDir -Filter 'trackc-*.log' -File -ErrorAction SilentlyContinue).Count -ge 1)
+            (@(Get-ChildItem -LiteralPath $iterGuiLogDir -Filter 'xlssplit-*.log' -File -ErrorAction SilentlyContinue).Count -ge 1)
         }
         if ($reportFiles.Count -ge 1) {
             $rep = $null
@@ -1102,7 +1102,7 @@ function Invoke-OneIteration([int]$iter) {
         # 트리는 이 xls 자신의 경로(ListPaths)로 만들었으므로, 폴더 노드 하나를 체크하고 실행하면 그 폴더의 항목만
         # 나와야 한다(다른 폴더의 체커 폴더는 아예 생기지 않는다). 출력은 별도 폴더로 보내 전건 실행 결과와 섞지 않는다.
         $out2 = Join-Path $work 'out-scoped'
-        UIA-SetValue (UIA-First $main 'TrackCOutputPathBox') $out2
+        UIA-SetValue (UIA-First $main 'XlsOutputPathBox') $out2
 
         $keepNode = Get-ScopeNode $main $SCOPE_KEEP_DIR
         Check "X) 범위 트리에서 '$SCOPE_KEEP_DIR' 폴더 노드 발견" { $null -ne $keepNode }
@@ -1137,31 +1137,31 @@ function Invoke-OneIteration([int]$iter) {
         }
         Write-UiaTree $main "iteration $iter · 6단계: 범위 좁힌 실행 후" ("tree-6-after-scoped-run-iter$iter.txt") | Out-Null
 
-        # ================= (T) 대분류 전환 → A/B 화면 =================
+        # ================= (T) 대분류 전환 → 코드 자동수정 화면 =================
         $switched = UIA-SelectItem $fixTab
         Check "T) SectionFixTab 선택(SelectionItemPattern)" { $switched }
         $fixShown = Wait-For { (-not (Element-Absent $main 'TargetPathBox')) } 8
-        Check "T) A/B 화면 등장: 대상 경로 입력(TargetPathBox) 렌더" { $fixShown }
-        Check "T) A/B 화면에 로컬 소스 범위 트리(ScopeTree) 렌더" { -not (Element-Absent $main 'ScopeTree') }
-        Check "T) A/B 화면에 코드 규칙 체크박스(ASObjectVarSafe) 렌더" { -not (Element-Absent $main 'ASObjectVarSafe') }
-        Check "T) [핵심] A/B 화면에는 XLS 전용 컨트롤이 없음(TrackCXlsPathBox · XlsScopeTree)" {
-            (Element-Absent $main 'TrackCXlsPathBox') -and (Element-Absent $main 'XlsScopeTree')
+        Check "T) 코드 자동수정 화면 등장: 대상 경로 입력(TargetPathBox) 렌더" { $fixShown }
+        Check "T) 코드 자동수정 화면에 로컬 소스 범위 트리(ScopeTree) 렌더" { -not (Element-Absent $main 'ScopeTree') }
+        Check "T) 코드 자동수정 화면에 코드 규칙 체크박스(ASObjectVarSafe) 렌더" { -not (Element-Absent $main 'ASObjectVarSafe') }
+        Check "T) [핵심] 코드 자동수정 화면에는 XLS 전용 컨트롤이 없음(XlsPathBox · XlsScopeTree)" {
+            (Element-Absent $main 'XlsPathBox') -and (Element-Absent $main 'XlsScopeTree')
         }
         Check "T) 대분류 선택 상태가 바뀜(Fix 선택 · XLS 해제)" {
             (UIA-IsSelected $fixTab) -and (-not (UIA-IsSelected $xlsTab))
         }
 
         # ============ (U) 실사용자 언어 라벨 + 옵션 제거 + 커밋 안 함 안내 ============
-        # 화면에서는 트랙(A/B/C) 대신 하는 일로 부른다. 내부 식별자(AutomationId TrackATab/TrackBTab, enum,
+        # 화면에서는 내부 분류 대신 하는 일로 부른다. 내부 식별자(AutomationId CodeRuleTab/CommentTab, enum,
         # 커밋 메시지 prefix)는 그대로이므로, 라벨은 "id 로 찾아 Name 을 읽어" 확인한다.
-        $tabAName = UIA-FirstName $main 'TrackATab'
-        $tabBName = UIA-FirstName $main 'TrackBTab'
+        $tabAName = UIA-FirstName $main 'CodeRuleTab'
+        $tabBName = UIA-FirstName $main 'CommentTab'
         Check "U) 하위 탭 라벨 = '코드 규칙' (실제: '$tabAName')" { $tabAName -eq '코드 규칙' }
         Check "U) 하위 탭 라벨 = '주석·레이아웃' (실제: '$tabBName')" { $tabBName -eq '주석·레이아웃' }
 
         $runNameA = UIA-FirstName $main 'RunButton'
         Check "U) 실행 버튼 라벨([코드 규칙] 탭) = '코드 규칙 수정 실행' (실제: '$runNameA')" { $runNameA -eq '코드 규칙 수정 실행' }
-        UIA-SelectItem (UIA-First $main 'TrackBTab') | Out-Null
+        UIA-SelectItem (UIA-First $main 'CommentTab') | Out-Null
         Wait-For { (UIA-FirstName $main 'RunButton') -eq '주석·레이아웃 수정 실행' } 6 | Out-Null
         $runNameB = UIA-FirstName $main 'RunButton'
         Check "U) 실행 버튼 라벨([주석·레이아웃] 탭) = '주석·레이아웃 수정 실행' (실제: '$runNameB')" {
@@ -1172,7 +1172,7 @@ function Invoke-OneIteration([int]$iter) {
         $rulesB = UIA-FirstName $main 'SummaryRulesText'
         Check "U) 요약바 규칙 문구가 사용자 언어 (실제: '$rulesB')" { $rulesB -like '주석·레이아웃 · 선택 *개' }
         # 스냅샷/후속 단정은 기본 상태(=[코드 규칙] 탭)에서 찍는다.
-        UIA-SelectItem (UIA-First $main 'TrackATab') | Out-Null
+        UIA-SelectItem (UIA-First $main 'CodeRuleTab') | Out-Null
         Wait-For { (UIA-FirstName $main 'RunButton') -eq '코드 규칙 수정 실행' } 6 | Out-Null
         $rulesA = UIA-FirstName $main 'SummaryRulesText'
         Check "U) 요약바 규칙 문구가 사용자 언어 (실제: '$rulesA')" { $rulesA -like '코드 규칙 · 선택 *개' }
@@ -1185,7 +1185,7 @@ function Invoke-OneIteration([int]$iter) {
         # 규칙별 커밋은 유지한다(롤백 단위 = 규칙, 러너의 컴파일 게이트도 이 모드에서만 의미가 있다).
         # [코드 자동수정] 화면에서만 보이고 기본값은 꺼짐(=파일만 수정)이며, 켜면 요약 문구가 커밋 모드로 바뀐다.
         $commitBox = UIA-First $main 'CommitCheck'
-        Check "U) [유지] 규칙별 커밋 체크박스가 A/B 화면에 존재" { $null -ne $commitBox }
+        Check "U) [유지] 규칙별 커밋 체크박스가 코드 자동수정 화면에 존재" { $null -ne $commitBox }
         if ($commitBox) {
             $tog = $commitBox.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
             Check "U) 규칙별 커밋 기본값 = 꺼짐(파일만 수정)" { $tog.Current.ToggleState -eq 'Off' }
@@ -1199,9 +1199,9 @@ function Invoke-OneIteration([int]$iter) {
         }
 
         $fixTexts = @(Get-AllVisibleText $main)
-        $fixTrackHits = @(Find-TextMatches $fixTexts 'Track A') + @(Find-TextMatches $fixTexts 'Track B')
-        Check "U) [핵심] A/B 화면 텍스트에 'Track A'/'Track B' 문구 없음 (적중 $($fixTrackHits.Count)개: $($fixTrackHits -join ' | '))" {
-            $fixTrackHits.Count -eq 0
+        $fixInternalIdHits = @(Find-TextMatches $fixTexts 'CodeRuleTab') + @(Find-TextMatches $fixTexts 'CommentTab')
+        Check "U) [핵심] 코드 자동수정 화면 텍스트에 내부 식별자('CodeRuleTab'/'CommentTab') 없음 (적중 $($fixInternalIdHits.Count)개: $($fixInternalIdHits -join ' | '))" {
+            $fixInternalIdHits.Count -eq 0
         }
         # DryRun/생성파일 포함만 제거했다. 규칙별 커밋은 롤백 단위라 화면에 남아 있어야 한다(위 U 블록에서 동작 검증).
         $optionHits = @(Find-TextMatches $fixTexts 'DryRun') + @(Find-TextMatches $fixTexts '생성 파일 포함')
@@ -1209,7 +1209,7 @@ function Invoke-OneIteration([int]$iter) {
             $optionHits.Count -eq 0
         }
         foreach ($fixId in @('TargetPathBox', 'ScopeTree', 'RulesTabs', 'RunButton')) {
-            Check-IdLayout $main '메인창(A/B)' $fixId | Out-Null
+            Check-IdLayout $main '메인창(코드 자동수정)' $fixId | Out-Null
         }
         Write-UiaTree $main "iteration $iter · 7단계: 코드 자동수정 대분류" ("tree-7-fix-section-iter$iter.txt") | Out-Null
         $shotFix = Request-Snapshot $iterShotDir 'req-fix-section' $SHOT_TIMEOUT_SEC $main
@@ -1254,7 +1254,7 @@ function Invoke-OneIteration([int]$iter) {
                 ($null -ne $info) -and ($info.W -gt 0) -and ($info.H -gt 0) -and ($s.Length -gt $MIN_SHOT_BYTES)
             }
         }
-        Check "S) 요청 기반 캡처 5종 생성(XLS 화면 · 관리창 · 지정 저장 후 · 범위 체크 · A/B 화면)" {
+        Check "S) 요청 기반 캡처 5종 생성(XLS 화면 · 관리창 · 지정 저장 후 · 범위 체크 · 코드 자동수정 화면)" {
             ($null -ne $shotMain) -and ($null -ne $shotMgr) -and ($null -ne $shotAssign) -and
             ($null -ne $shotScoped) -and ($null -ne $shotFix)
         }
@@ -1317,7 +1317,7 @@ $cacheAfter = Snapshot-Dir $realCache
 Check "실 캐시 references\checkers 미변경(--guides-dir override)" { Snapshots-Equal $cacheBefore $cacheAfter }
 
 # ---- (U) 소스 계약: GUI = 항상 -NoCommit · CLI 러너 옵션은 보존 -----------
-# A/B 실행 자체는 이 하네스에서 돌리지 않는다(대상 소스 트리 + git + 엔진 빌드가 필요해 비용이 크다).
+# 자동수정 실행 자체는 이 하네스에서 돌리지 않는다(대상 소스 트리 + git + 엔진 빌드가 필요해 비용이 크다).
 # 대신 "실행 후 안내 문구"와 "GUI 가 넘기는 커밋 인자"를 소스에서 직접 확인해 계약을 고정한다.
 $guiSource = [System.IO.File]::ReadAllText((Join-Path $RepositoryRoot 'tools\SparrowRunner.Gui\MainWindow.xaml.cs'))
 Check "U) GUI 실행 후 안내 문구가 소스에 존재('…개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.')" {

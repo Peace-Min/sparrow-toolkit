@@ -8,7 +8,7 @@ using SparrowXlsExport.Core;
 namespace SparrowRunner.Gui
 {
     /// <summary>
-    /// Track C([XLS 분리]) 범위 트리의 결과. 트리는 <b>로컬 소스를 스캔해서 만든 것이 아니라</b> xls 가 스스로
+    /// [XLS 분리] 범위 트리의 결과. 트리는 <b>로컬 소스를 스캔해서 만든 것이 아니라</b> xls 가 스스로
     /// 보고한 검출 경로(<see cref="SparrowExporter.ListPaths"/>)로 만든다. 그래서
     ///   * 프로젝트 경로 입력이 필요 없고(입력은 xls 하나),
     ///   * 어떤 언어(C/C++/C#/Java...)의 결과든 트리가 만들어지고,

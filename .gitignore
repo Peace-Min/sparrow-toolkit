@@ -17,7 +17,7 @@ issues_*.xls
 *.log
 
 # --- 진단 로그(테스트 산출) ---
-# tests\_logs\uia-*  : UIA 하네스의 result.log + UIA 트리 덤프 + 앱 세션 로그/Track C 리포트
+# tests\_logs\uia-*  : UIA 하네스의 result.log + UIA 트리 덤프 + 앱 세션 로그/[XLS 분리] 리포트
 # tests\_logs\validate-*.log : validate.ps1 트랜스크립트
 # 머신·실행마다 새로 생기고 각자 최신 N개만 보관한다. 커밋 대상 아님.
 tests/_logs/
@@ -37,6 +37,6 @@ __pycache__/
 references/sparrow-official-rules/
 
 # --- 체커 가이드(사용자 로컬 자산) ---
-# Track C 익스포터는 선행 문서를 요구하지 않는다. 체커별 가이드는 각자 필요한 만큼
+# [XLS 분리] 익스포터는 선행 문서를 요구하지 않는다. 체커별 가이드는 각자 필요한 만큼
 # 로컬로 쌓는 자산이라 레포가 배포하지 않는다.
 references/checkers/

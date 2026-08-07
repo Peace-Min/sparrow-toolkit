@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Test-only generator for the exhaustive Sparrow xls coverage measurement. Reads the real MyApp issues
-       .xls with NPOI, extracts the flagged code of every Track A/B finding, wraps each into a parseable
+       .xls with NPOI, extracts the flagged code of every [코드 규칙]·[주석·레이아웃] finding, wraps each into a parseable
        snippet (Roslyn-validated), and writes per-checker .cs batches + a manifest. NOT committed binaries;
        built on demand by tests\sparrow-exhaustive-xls-test.ps1. Self-skips when the xls is absent. -->
   <PropertyGroup>

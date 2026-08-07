@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    REAL-XLS SCOPE LOOP regression for Track C directory/file scope selection (team collaboration).
+    REAL-XLS SCOPE LOOP regression for [XLS 분리] directory/file scope selection (team collaboration).
 
     Reconstructs the REAL project structure from the MyApp Sparrow xls into a MIRROR checkout at a
     DIFFERENT drive/root (a temp dir) — i.e. a teammate whose checkout path differs from the path baked

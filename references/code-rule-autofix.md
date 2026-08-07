@@ -1,6 +1,6 @@
-# Track A 결정론적 자동수정
+# 코드 규칙 결정론적 자동수정
 
-Track A는 Sparrow 코드 규칙 계열을 LLM 없이 자동수정하는 경로다. 현재 운영 기준은 **Roslyn 기반 `SparrowSyntaxFix` 단독 사용**이다.
+[코드 규칙] 갈래는 Sparrow 코드 규칙 계열을 LLM 없이 자동수정하는 경로다. 현재 운영 기준은 **Roslyn 기반 `SparrowSyntaxFix` 단독 사용**이다.
 
 ## 운영 원칙
 
@@ -16,7 +16,7 @@ Track A는 Sparrow 코드 규칙 계열을 LLM 없이 자동수정하는 경로�
 현행 규칙 키는 **14개**다. 아래 표가 전부이며, 하나라도 빠지면 이 문서가 낡은 것이다
 (원천은 `tools/_internal/SparrowSyntaxFix/Program.cs` 의 `RuleOrder` 배열).
 
-| Sparrow 체커 | Track A 규칙 | 대표 변경 |
+| Sparrow 체커 | 코드 규칙 | 대표 변경 |
 |---|---|---|
 | `PRACTICE.OBJECT_INSTANTIATION.NOT_USED_IMPLICIT_TYPING` | `objectvar-safe`, `objectvar-narrowing` | `Foo x = new Foo();` -> `var x = new Foo();` / (narrowing) 상위 타입·인터페이스 선언을 실제 생성 타입 `var` 로 축소 — **검토필요** |
 | `PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING` | `obviousvar`, `nullvar`, `localconst` | `string s = "A";` -> `var s = "A";` |

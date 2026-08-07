@@ -1,12 +1,12 @@
 # 체커별 실수정 Diff 예시 코퍼스
 
-이 폴더는 Sparrow Track A/B/C 보완을 위해 **체커별 실제 수정 커밋에서 최소 before/after 패턴만 추출한 자료**를 쌓는 곳이다.
+이 폴더는 Sparrow [코드 규칙]·[주석·레이아웃]·[XLS 분리] 보완을 위해 **체커별 실제 수정 커밋에서 최소 before/after 패턴만 추출한 자료**를 쌓는 곳이다.
 
 목표는 폐쇄망/업무 원본 코드를 반출하지 않고, 이미 사람이 수정해 통과시킨 커밋의 핵심 diff를 익명화하여 다음 작업에 재사용하는 것이다.
 
-- Track A/B CLI가 놓친 자동화 후보 발굴.
-- Track A/B CLI guard 조건 보강.
-- Track C LLM 판단 가이드의 before/after 예시 강화.
+- [코드 규칙]·[주석·레이아웃] CLI가 놓친 자동화 후보 발굴.
+- [코드 규칙]·[주석·레이아웃] CLI guard 조건 보강.
+- [XLS 분리] LLM 판단 가이드의 before/after 예시 강화.
 - 로컬/폐쇄망 LLM이 판단하기 어려운 케이스의 공통 패턴 축적.
 
 ## 입력 자료
@@ -23,10 +23,10 @@
 예:
 
 ```text
-sparrow(A): PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING var 변환
-sparrow(A)! 검토필요: foreach Cast<T> 기반 var 변환
-sparrow(C): FORWARD_NULL null guard 추가
-sparrow(C): RESOURCE_LEAK using 블록 전환
+sparrow(rule): PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING var 변환
+sparrow(rule)! 검토필요: foreach Cast<T> 기반 var 변환
+sparrow(xls): FORWARD_NULL null guard 추가
+sparrow(xls): RESOURCE_LEAK using 블록 전환
 ```
 
 ## 비식별화 원칙
@@ -101,7 +101,7 @@ references/real-fix-patterns/PRACTICE.LOOP_VARIABLE.NOT_USED_IMPLICIT_TYPING.md
 ### 자동화 판단
 
 - CLI 자동화 가능: 예|아니오|조건부
-- 적용 Track: A|B|C|공통
+- 적용 갈래: 코드 규칙|주석·레이아웃|XLS 분리|공통
 - 필요한 guard:
 - 빌드/동작 보존 포인트:
 
@@ -122,8 +122,8 @@ LLM 또는 사람이 체커별 커밋을 보고 패턴을 정리할 때는 아�
 체커 해결에 필요한 최소 before/after 패턴만 익명화해서 정리해라.
 
 목표:
-- Track A/B CLI가 놓친 패턴 보완
-- Track C LLM 판단 가이드의 예시 강화
+- [코드 규칙]·[주석·레이아웃] CLI가 놓친 패턴 보완
+- [XLS 분리] LLM 판단 가이드의 예시 강화
 - 폐쇄망 코드 반출 없이 일반화된 수정 패턴 축적
 
 규칙:
@@ -142,14 +142,14 @@ LLM 또는 사람이 체커별 커밋을 보고 패턴을 정리할 때는 아�
 
 패턴 문서가 생겼다고 바로 자동화하지 않는다.
 
-Track A/B CLI에 반영 가능한 경우:
+[코드 규칙]·[주석·레이아웃] CLI에 반영 가능한 경우:
 
 - before/after가 구문적으로 명확하다.
 - Roslyn으로 타입/문법 guard를 둘 수 있다.
 - 정적 타입 축소, 소유권 변경, 예외 의미 변경이 없다.
 - 실패 시 빌드 실패로 감지 가능하거나 안전하게 skip 가능하다.
 
-Track C LLM 가이드에 반영할 경우:
+[XLS 분리] LLM 가이드에 반영할 경우:
 
 - 체커 결함 판별 기준을 더 명확히 해준다.
 - `보류`와 `수정`을 가르는 판단 포인트가 있다.

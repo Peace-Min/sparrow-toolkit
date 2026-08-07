@@ -121,14 +121,14 @@
             </Setter>
         </Style>
 
-        <!-- 대분류(섹션) 탭은 하위 트랙 탭보다 크게 — 화면이 통째로 바뀌는 전환임을 시각적으로 알린다. -->
+        <!-- 대분류(섹션) 탭은 하위 탭보다 크게 — 화면이 통째로 바뀌는 전환임을 시각적으로 알린다. -->
         <Style x:Key="SectionTabItem" TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="Padding" Value="20,11"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
 
-        <!-- 범위 트리 한 줄. 로컬 소스 트리(Track A/B)와 xls 경로 트리(Track C)가 같은 노드 타입을 쓴다.
+        <!-- 범위 트리 한 줄. 로컬 소스 트리([코드 규칙]·[주석·레이아웃])와 xls 경로 트리([XLS 분리])가 같은 노드 타입을 쓴다.
              Label = 이름(+ 검출 건수). AutomationId/Name 은 UIA 하네스가 노드를 이름으로 찾아 토글하기 위한 것. -->
         <HierarchicalDataTemplate DataType="{x:Type local:SourceScopeNode}" ItemsSource="{Binding Children}">
             <CheckBox IsThreeState="{Binding HasChildren}"
@@ -205,12 +205,11 @@
         </StackPanel>
 
         <!-- ===================== 대분류 2개 ===================== -->
-        <!-- A. 코드 자동수정(내부 Track A/B) : C# 전용 · 소스 파일을 고친다(파괴적). 커밋 여부는
+        <!-- 1. 코드 자동수정([코드 규칙] / [주석·레이아웃]) : C# 전용 · 소스 파일을 고친다(파괴적). 커밋 여부는
                 [규칙별 커밋 생성](CommitCheck) 체크가 정한다 — 꺼짐(기본)이면 러너에 -NoCommit(파일만 수정,
                 검토·커밋은 사용자가 git 으로), 켜짐이면 -Commit(규칙 하나 = 커밋 하나).
-             B. XLS 분리(내부 Track C)       : 언어 무관 · 프로젝트 경로 불필요 · 읽기전용.
-             둘은 입력도 위험도도 다르므로 같은 화면에 섞지 않는다.
-             화면 명칭 ↔ 내부 트랙: [코드 규칙]=A · [주석·레이아웃]=B · [XLS 분리]=C (UI 에는 트랙 명칭을 쓰지 않는다). -->
+             2. XLS 분리                                    : 언어 무관 · 프로젝트 경로 불필요 · 읽기전용.
+             둘은 입력도 위험도도 다르므로 같은 화면에 섞지 않는다. -->
         <TabControl x:Name="SectionTabs" AutomationProperties.AutomationId="SectionTabs"
                     Grid.Row="1" BorderThickness="0" Background="Transparent"
                     SelectionChanged="SectionTabs_SelectionChanged">
@@ -305,7 +304,7 @@
                                     BorderThickness="1" CornerRadius="12" Padding="14">
                                 <TabControl x:Name="RulesTabs" AutomationProperties.AutomationId="RulesTabs"
                                             BorderThickness="0" Background="Transparent" SelectionChanged="RulesTabs_SelectionChanged">
-                                    <TabItem x:Name="TrackATab" AutomationProperties.AutomationId="TrackATab" Header="코드 규칙">
+                                    <TabItem x:Name="CodeRuleTab" AutomationProperties.AutomationId="CodeRuleTab" Header="코드 규칙">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
                                             <StackPanel>
                                                 <TextBlock Text="기본 자동수정" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
@@ -332,7 +331,7 @@
                                         </ScrollViewer>
                                     </TabItem>
 
-                                    <TabItem x:Name="TrackBTab" AutomationProperties.AutomationId="TrackBTab" Header="주석·레이아웃">
+                                    <TabItem x:Name="CommentTab" AutomationProperties.AutomationId="CommentTab" Header="주석·레이아웃">
                                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
                                             <StackPanel>
                                                 <TextBlock Text="기본 주석 규칙" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
@@ -523,11 +522,11 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="TrackCXlsPathBox" AutomationProperties.AutomationId="TrackCXlsPathBox"
+                                                <TextBox x:Name="XlsPathBox" AutomationProperties.AutomationId="XlsPathBox"
                                                          Style="{StaticResource InputBox}" IsReadOnly="True"
-                                                         TextChanged="TrackCXlsPathBox_TextChanged"/>
-                                                <Button x:Name="BrowseTrackCXlsButton" Grid.Column="1" Content="XLS 선택"
-                                                        Margin="8,0,0,0" Click="BrowseTrackCXlsButton_Click"/>
+                                                         TextChanged="XlsPathBox_TextChanged"/>
+                                                <Button x:Name="BrowseXlsButton" Grid.Column="1" Content="XLS 선택"
+                                                        Margin="8,0,0,0" Click="BrowseXlsButton_Click"/>
                                             </Grid>
                                             <TextBlock Text="입력은 XLS 하나입니다. 프로젝트 경로도, 체커 가이드 같은 선행 문서도 필요하지 않습니다."
                                                        Foreground="{StaticResource TextTertiaryBrush}" FontSize="12"
@@ -541,10 +540,10 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="TrackCOutputPathBox" AutomationProperties.AutomationId="TrackCOutputPathBox"
+                                                <TextBox x:Name="XlsOutputPathBox" AutomationProperties.AutomationId="XlsOutputPathBox"
                                                          Style="{StaticResource InputBox}"/>
-                                                <Button x:Name="BrowseTrackCOutputButton" Grid.Column="1" Content="폴더 선택"
-                                                        Margin="8,0,0,0" Click="BrowseTrackCOutputButton_Click"/>
+                                                <Button x:Name="BrowseXlsOutputButton" Grid.Column="1" Content="폴더 선택"
+                                                        Margin="8,0,0,0" Click="BrowseXlsOutputButton_Click"/>
                                             </Grid>
                                             <TextBlock Text="왼쪽에서 고른 범위(팀 분담)에 해당하는 항목만 md 로 분리됩니다."
                                                        Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
@@ -562,7 +561,7 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel>
                                                 <TextBlock Text="체커 규칙" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
-                                                <TextBlock x:Name="TrackCMappingSummary" AutomationProperties.AutomationId="TrackCMappingSummary"
+                                                <TextBlock x:Name="CheckerMappingSummary" AutomationProperties.AutomationId="CheckerMappingSummary"
                                                            Text="XLS를 선택하면 검출 체커가 요약됩니다." Style="{StaticResource MutedText}"
                                                            TextWrapping="Wrap"/>
                                                 <TextBlock Text="규칙은 이름 붙인 라이브러리이고, 체커에 규칙을 직접 지정해야 부착됩니다(파일명이 체커키와 같아도 자동 지정 안 함). 규칙 편집·체커 지정은 [체커 규칙 관리] 창에서 합니다."
@@ -595,7 +594,7 @@
             </TabItem>
         </TabControl>
 
-        <!-- 실행/로그는 두 대분류가 공유한다. 실행 버튼은 항상 '지금 선택된 대분류의 트랙'만 돌린다. -->
+        <!-- 실행/로그는 두 대분류가 공유한다. 실행 버튼은 항상 '지금 선택된 대분류의 기능'만 돌린다. -->
         <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
                 BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,12,0,0">
             <Grid>
@@ -619,8 +618,8 @@
                             Click="StopButton_Click" IsEnabled="False"/>
                     <Button x:Name="OpenTargetButton" Grid.Column="2" Content="대상 폴더 열기" Margin="8,0,0,0"
                             Click="OpenTargetButton_Click"/>
-                    <Button x:Name="OpenTrackCOutputButton" Grid.Column="3" Content="XLS 분리 출력 열기" Margin="8,0,0,0"
-                            Click="OpenTrackCOutputButton_Click" IsEnabled="False"/>
+                    <Button x:Name="OpenXlsOutputButton" Grid.Column="3" Content="XLS 분리 출력 열기" Margin="8,0,0,0"
+                            Click="OpenXlsOutputButton_Click" IsEnabled="False"/>
                     <Button x:Name="ClearLogButton" Grid.Column="4" Content="로그 지우기" Margin="8,0,0,0"
                             Click="ClearLogButton_Click"/>
                     <!-- 규칙별 커밋: 켜면 러너가 규칙 하나를 적용할 때마다 커밋을 만든다(롤백 단위 = 규칙).

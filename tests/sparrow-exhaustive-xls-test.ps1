@@ -1,8 +1,8 @@
 ﻿#requires -Version 5.1
 <#
-    EXHAUSTIVE Sparrow Track A/B xls coverage measurement.
+    EXHAUSTIVE Sparrow [코드 규칙]·[주석·레이아웃] xls coverage measurement.
 
-    Extracts the REAL flagged code of EVERY Track A/B-relevant finding in the MyApp Sparrow result .xls (none
+    Extracts the REAL flagged code of EVERY [코드 규칙]·[주석·레이아웃]-relevant finding in the MyApp Sparrow result .xls (none
     skipped), generates a parseable .cs snippet for each, runs the matching tool+rule (SparrowSyntaxFix /
     SparrowCommentFix) over every snippet, and reports per-finding whether the tool transformed it. Purpose:
     prove no real detected pattern slips through -- surface any real flagged code the tools fail to handle.
@@ -173,7 +173,7 @@ try {
     if ((Invoke-Quiet "build" @($commentProj, "-c", "Release", "-v", "q")) -ne 0) { throw "SparrowCommentFix build failed" }
     if ((Invoke-Quiet "build" @($genProj, "-c", "Release", "-v", "q")) -ne 0) { throw "generator build failed" }
 
-    Write-Host "  generating snippets from xls (this reads all Track A/B findings)..."
+    Write-Host "  generating snippets from xls (this reads all [코드 규칙]·[주석·레이아웃] findings)..."
     # 생성기 stdout 도 공유 로그로 흘러가므로 계정명이 박힌 절대 경로(gen root)를 접어서 중계한다.
     $genLines = & $dotnet.Source $genDll "--xls" $XlsPath "--out" $genOut
     $genExitCode = $LASTEXITCODE
@@ -197,7 +197,7 @@ try {
     function Detail([string]$s) { $detail.Add($s) }
 
     Emit ""
-    Emit "================ EXHAUSTIVE SPARROW TRACK A/B XLS COVERAGE ================"
+    Emit "================ EXHAUSTIVE SPARROW AUTOFIX XLS COVERAGE ================"
     # [보안] xls 의 경로/파일명은 찍지 않는다(사내 리포트 파일명에 사람 ID 가 들어 있고 이 출력은
     # 신고용 로그로 첨부된다). 출처 라벨 + 읽어들인 findings 건수만 남긴다.
     Emit ("xls:        <" + $xlsOrigin + ">  (findings " + @($rows).Count + "건)")
@@ -254,7 +254,7 @@ try {
     }
 
     Emit ""
-    Emit "================ PER-RULE ATTRIBUTION (Track A var checkers) ================"
+    Emit "================ PER-RULE ATTRIBUTION (코드 규칙 var checkers) ================"
     foreach ($slug in $slugOrder) {
         $meta = $checkerMeta[$slug]
         if ($meta.tool -ne "syntax") { continue }

@@ -6,7 +6,7 @@
 // that gap: `tests\_logs\uia-<stamp>\shots\*.png` is a real image of the real window.
 //
 // Two triggers (both OFF unless --screenshot-dir <DIR> is given — no arg = zero behaviour change):
-//   1. 자동 지점  — 메인창 로드 완료 / 관리창 오픈 직후 / Track C 실행 완료 후 (MainWindow calls Capture/CaptureWhenIdle)
+//   1. 자동 지점  — 메인창 로드 완료 / 관리창 오픈 직후 / [XLS 분리] 실행 완료 후 (MainWindow calls Capture/CaptureWhenIdle)
 //   2. 요청 기반  — a `capture.request` file appearing in that folder captures the ACTIVE window at any moment
 //                   (so a harness can photograph transient states); its content, if any, becomes the name suffix.
 //

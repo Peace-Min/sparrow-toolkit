@@ -11,7 +11,7 @@
                                          (Run-SparrowSyntaxFix.ps1 의 fallback이 이 경로를 찾음)
       2) _internal\SparrowCommentFix  -> _internal\SparrowCommentFix\publish\SparrowCommentFix.exe
                                          (Run-SparrowCommentFix.ps1 의 fallback이 이 경로를 찾음)
-      3) _internal\SparrowXlsExport   -> _internal\SparrowXlsExport\publish\SparrowXlsExport.exe  (Track C CLI)
+      3) _internal\SparrowXlsExport   -> _internal\SparrowXlsExport\publish\SparrowXlsExport.exe  (XLS 분리 CLI)
       4) SparrowRunner.Gui            -> SparrowRunner.Gui\publish\SparrowRunner.Gui.exe          (통합 WPF GUI)
 
     기본은 self-contained(win-x64): 대상 PC에 .NET 런타임이 아예 없어도 됨(런타임 동봉).
@@ -51,10 +51,10 @@ $scMode = if ($selfContained) { 'true' } else { 'false' }
 
 # 발행 대상 4종. Exe = 발행 후 존재 확인용 실행 파일명(CLI는 러너 fallback 검증에 쓰임).
 $projects = @(
-    [pscustomobject]@{ Name = 'SparrowSyntaxFix';  Kind = 'CLI(Track A)'; Csproj = (Join-Path $scriptDir '_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj');   OutDir = (Join-Path $scriptDir '_internal\SparrowSyntaxFix\publish');   Exe = 'SparrowSyntaxFix.exe' }
-    [pscustomobject]@{ Name = 'SparrowCommentFix'; Kind = 'CLI(Track B)'; Csproj = (Join-Path $scriptDir '_internal\SparrowCommentFix\SparrowCommentFix.csproj'); OutDir = (Join-Path $scriptDir '_internal\SparrowCommentFix\publish'); Exe = 'SparrowCommentFix.exe' }
-    [pscustomobject]@{ Name = 'SparrowXlsExport'; Kind = 'CLI(Track C)'; Csproj = (Join-Path $scriptDir '_internal\SparrowXlsExport\SparrowXlsExport.csproj'); OutDir = (Join-Path $scriptDir '_internal\SparrowXlsExport\publish'); Exe = 'SparrowXlsExport.exe' }
-    [pscustomobject]@{ Name = 'SparrowRunner.Gui'; Kind = 'WPF GUI';     Csproj = (Join-Path $scriptDir 'SparrowRunner.Gui\SparrowRunner.Gui.csproj');            OutDir = (Join-Path $scriptDir 'SparrowRunner.Gui\publish');           Exe = 'SparrowRunner.Gui.exe' }
+    [pscustomobject]@{ Name = 'SparrowSyntaxFix';  Kind = 'CLI(코드 규칙)';    Csproj = (Join-Path $scriptDir '_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj');   OutDir = (Join-Path $scriptDir '_internal\SparrowSyntaxFix\publish');   Exe = 'SparrowSyntaxFix.exe' }
+    [pscustomobject]@{ Name = 'SparrowCommentFix'; Kind = 'CLI(주석·레이아웃)'; Csproj = (Join-Path $scriptDir '_internal\SparrowCommentFix\SparrowCommentFix.csproj'); OutDir = (Join-Path $scriptDir '_internal\SparrowCommentFix\publish'); Exe = 'SparrowCommentFix.exe' }
+    [pscustomobject]@{ Name = 'SparrowXlsExport';  Kind = 'CLI(XLS 분리)';     Csproj = (Join-Path $scriptDir '_internal\SparrowXlsExport\SparrowXlsExport.csproj');   OutDir = (Join-Path $scriptDir '_internal\SparrowXlsExport\publish');   Exe = 'SparrowXlsExport.exe' }
+    [pscustomobject]@{ Name = 'SparrowRunner.Gui'; Kind = 'WPF GUI';            Csproj = (Join-Path $scriptDir 'SparrowRunner.Gui\SparrowRunner.Gui.csproj');            OutDir = (Join-Path $scriptDir 'SparrowRunner.Gui\publish');           Exe = 'SparrowRunner.Gui.exe' }
 )
 
 $modeText = if ($selfContained) { "self-contained ($Runtime, 런타임 동봉 - 대상 PC 무설치)" } else { "framework-dependent ($Runtime, 대상 PC에 .NET 8 런타임 필요)" }
@@ -161,7 +161,7 @@ Write-Host "==================== 폐쇄망 반입 체크리스트 ==============
 Write-Host "1) 복사할 것: 이 레포(sparrow-toolkit) 폴더 트리 전체"
 Write-Host ("   - 방금 생성된 publish\ 산출물 {0}곳:" -f $projects.Count)
 foreach ($p in $projects) { Write-Host ("       {0}" -f $p.OutDir) }
-Write-Host "   - (선행 문서 불필요: Track C 익스포터는 Sparrow xls 하나만 입력으로 받습니다)"
+Write-Host "   - (선행 문서 불필요: [XLS 분리] 익스포터는 Sparrow xls 하나만 입력으로 받습니다)"
 Write-Host "   - tools\Run-SparrowRunnerGui.cmd, tools\Run-SparrowAll.cmd, tools\_internal\...\Run-*.ps1 (러너/진입점)"
 Write-Host ""
 if ($selfContained) {

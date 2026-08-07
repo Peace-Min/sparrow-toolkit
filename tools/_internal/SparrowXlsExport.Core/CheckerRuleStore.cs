@@ -1,4 +1,4 @@
-// CheckerRuleStore: the persistence layer for the Track C "named rule library + explicit checker assignments"
+// CheckerRuleStore: the persistence layer for the [XLS 분리] "named rule library + explicit checker assignments"
 // model. It owns two things under a guides directory (default: <skill>\references\checkers, overridable in the
 // GUI/tests via --guides-dir):
 //

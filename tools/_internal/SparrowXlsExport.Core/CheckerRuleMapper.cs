@@ -1,4 +1,4 @@
-// CheckerRuleMapper: OPTIONAL, self-contained checker-rule attachment layer for the Track C exporter.
+// CheckerRuleMapper: OPTIONAL, self-contained checker-rule attachment layer for the [XLS 분리] exporter.
 //
 // The exporter (SparrowExporter) is left PURE — it only ever writes <체커 키>\{ID}_{파일명}_{라인}.md with no
 // rule text. This mapper runs AFTER the exporter, over its output tree, and — when the user has EXPLICITLY
@@ -33,7 +33,7 @@ using System.Text;
 namespace SparrowXlsExport.Core
 {
     /// <summary>Per-checker outcome of a <see cref="CheckerRuleMapper.Apply"/> run — the evidence a later reader
-    /// (or an AI reading the Track C run report) needs to tell "no rule assigned" from "assigned but the rule file
+    /// (or an AI reading the [XLS 분리] run report) needs to tell "no rule assigned" from "assigned but the rule file
     /// is gone" from "attached to N items".</summary>
     public sealed class CheckerMapDetail
     {

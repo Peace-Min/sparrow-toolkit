@@ -5,7 +5,7 @@
 > 이 문서는 **도구를 쓰는 사람**을 위한 것이다. 도구를 **고치거나 확장하려면**
 > [architecture.md](architecture.md) → [extending.md](extending.md) → [../CONTRIBUTING.md](../CONTRIBUTING.md) 순으로 읽는다.
 
-> **Track C는 순수 익스포터다.** 선행 문서(체커 가이드·프롬프트·판정 계약)를 일절 요구하지 않는다. 입력은 Sparrow `.xls` 하나이고, 출력은 체커 키 폴더 + 그 안의 항목 md(`<체커키>/{ID}_{파일명}_{라인}.md`) 뿐이다.
+> **[XLS 분리]는 순수 익스포터다.** 선행 문서(체커 가이드·프롬프트·판정 계약)를 일절 요구하지 않는다. 입력은 Sparrow `.xls` 하나이고, 출력은 체커 키 폴더 + 그 안의 항목 md(`<체커키>/{ID}_{파일명}_{라인}.md`) 뿐이다.
 
 ## 빠른 실행
 
@@ -16,11 +16,11 @@ SparrowRunner.Gui/SparrowRunner.Gui.sln
 ```
 
 명령줄에서 GUI를 바로 실행하려면 다음 파일을 사용한다. **받은 인자를 GUI에 그대로 전달**하므로
-`--trackc-xls` 같은 옵션도 여기에 붙이면 된다.
+`--xls` 같은 옵션도 여기에 붙이면 된다.
 
 ```text
 tools\Run-SparrowRunnerGui.cmd
-tools\Run-SparrowRunnerGui.cmd --trackc-xls C:\work\issues.xls
+tools\Run-SparrowRunnerGui.cmd --xls C:\work\issues.xls
 ```
 
 exe를 직접 부르고 싶다면 경로는 다음과 같다.
@@ -30,8 +30,8 @@ exe를 직접 부르고 싶다면 경로는 다음과 같다.
 | `dotnet build -c Release` 후(개발 PC) | `tools\SparrowRunner.Gui\bin\Release\net8.0-windows\SparrowRunner.Gui.exe` |
 | `publish-airgap.ps1` 발행 후(폐쇄망 반입본) | `tools\SparrowRunner.Gui\publish\SparrowRunner.Gui.exe` |
 
-GUI가 받는 CLI 옵션: `--trackc-xls <경로>` · `--trackc-out <경로>` · `--guides-dir <DIR>` · `--log-dir <DIR>` ·
-`--screenshot-dir <DIR>` · `--trackc-autorun` · `--open-rule-manager`.
+GUI가 받는 CLI 옵션: `--xls <경로>` · `--xls-out <경로>` · `--guides-dir <DIR>` · `--log-dir <DIR>` ·
+`--screenshot-dir <DIR>` · `--xls-autorun` · `--open-rule-manager`.
 
 ## GUI 화면 구성 — 대분류 2개
 
@@ -52,10 +52,9 @@ GUI 최상단에서 **무엇을 할지** 먼저 고른다. 두 대분류는 입�
 | **코드 자동수정 (C#)** | **[코드 규칙]** / **[주석·레이아웃]** | 대상 `.sln`/`.csproj`/폴더 | **로컬 소스 스캔** | 소스 파일을 **수정**(파괴적, 커밋은 [규칙별 커밋 생성] 체크 시에만), **C# 전용** |
 | **XLS 분리 (모든 언어)** | (없음) | **Sparrow 결과 XLS 하나** | **XLS 검출 경로** | **읽기전용**, **프로젝트 경로 불필요**, 언어 무관 |
 
-- **화면 명칭 ↔ 내부 트랙**: [코드 규칙] = Track A · [주석·레이아웃] = Track B · [XLS 분리] = Track C. 트랙은 코드/문서/커밋 메시지에만 쓰는 내부 명칭이고 화면에는 노출하지 않는다.
 - 실행 버튼은 항상 **지금 선택된 화면**만 돌린다([코드 자동수정]에서는 선택된 하위 탭, [XLS 분리]에서는 XLS 분리). 실행 버튼 라벨도 그에 맞춰 `코드 규칙 수정 실행` / `주석·레이아웃 수정 실행` / `XLS 분리 실행` 로 바뀐다. 하단 로그창은 공유한다.
 - **C/C++ 사용자는 [XLS 분리]만 쓰면 된다.** [코드 자동수정]은 Roslyn C# 파서 기반이라 다른 언어에 쓸 수 없고, 그 화면(및 프로젝트 경로 입력)은 [XLS 분리] 대분류에서는 아예 렌더되지 않는다.
-- `SparrowRunner.Gui.exe --trackc-xls <경로>` 로 기동하면 [XLS 분리] 대분류가 자동 선택된다.
+- `SparrowRunner.Gui.exe --xls <경로>` 로 기동하면 [XLS 분리] 대분류가 자동 선택된다.
 
 ### 커밋 동작 — [규칙별 커밋 생성] 체크박스 (기본 꺼짐)
 
@@ -86,7 +85,7 @@ GUI 는 러너에 `-Commit` 과 `-NoCommit` 중 **반드시 하나**를 넘기�
 
 GUI와 러너는 평소 `dotnet run`/`dotnet build`로 동작한다. 이는 대상 PC에 `.NET SDK`와 NuGet 복원(=인터넷)을 요구하므로, 인터넷이 없는 폐쇄망 PC에서는 그대로 실행되지 않는다. 오프라인 반입은 다음 순서로 한다.
 
-1. **인터넷 + `.NET SDK`가 있는 PC**에서 발행 스크립트를 실행한다. 도구 4종(Track A/B/C CLI + WPF GUI)이 각 프로젝트의 `publish\` 폴더로 발행된다.
+1. **인터넷 + `.NET SDK`가 있는 PC**에서 발행 스크립트를 실행한다. 도구 4종([코드 규칙]·[주석·레이아웃]·[XLS 분리] CLI + WPF GUI)이 각 프로젝트의 `publish\` 폴더로 발행된다.
 
    ```powershell
    # 기본: self-contained win-x64 (대상 PC에 .NET 런타임 불필요)
@@ -113,7 +112,7 @@ GUI와 러너는 평소 `dotnet run`/`dotnet build`로 동작한다. 이는 대�
    > 먼저 실행되기 때문이다. 증상은 "더블클릭했는데 아무 일도 안 일어남" 이다. 그때 무엇을 수집할지는
    > [README 진단 로그](../README.md#진단-로그-문제가-났을-때-무엇을-첨부하나) 참조.
 
-   > Track C 익스포터는 선행 문서를 읽지 않으므로 별도 반입 자료가 없다. 체커별 가이드를 각자 쌓아두었다면(`references\checkers\`) 그것만 원하는 대로 함께 옮기면 된다.
+   > [XLS 분리] 익스포터는 선행 문서를 읽지 않으므로 별도 반입 자료가 없다. 체커별 가이드를 각자 쌓아두었다면(`references\checkers\`) 그것만 원하는 대로 함께 옮기면 된다.
 
    > `publish\` 산출물은 머신마다 생성되는 것이라 저장소에 커밋하지 않는다(`.gitignore` 제외 대상). 반입은 파일 복사로 한다.
 
@@ -167,10 +166,10 @@ sparrow-toolkit/
 - 자동 조치는 반드시 반복 발생하는 정형 패턴에 한정한다.
 - Roslyn 구문 트리 또는 trivia 범위 안에서 수정하고, 문자열 리터럴 같은 비대상 영역은 건드리지 않는다.
 - 판단이 필요한 보안/품질 항목은 자동수정하지 않고 체커별 md로 분리해 넘긴다.
-- Track C는 어떤 항목도 버리지 않는다. 체커 키를 모르는 행도 그냥 하나의 항목 md가 된다(전건 정책 — 심각도/체커 필터 없음).
+- [XLS 분리]는 어떤 항목도 버리지 않는다. 체커 키를 모르는 행도 그냥 하나의 항목 md가 된다(전건 정책 — 심각도/체커 필터 없음).
 - 폐쇄망 실제 코드를 학습 자료로 남길 때는 `references/real-fix-patterns/`에 최소 before/after 형태만 익명화해서 기록한다.
 
-## Track C 출력물
+## [XLS 분리] 출력물
 
 익스포터는 지정한 출력 폴더에 **체커 키마다 폴더 하나**를 만들고 그 안에 항목 md만 넣는다.
 인덱스·요약·작업지침 같은 부속 파일은 일절 만들지 않는다.
@@ -231,9 +230,9 @@ Program Files 같은 쓰기 불가 위치에서 실행해도 되도록 설치 �
 > 3. **`cmd` 창에서 `tools\Run-SparrowRunnerGui.cmd` 를 직접 실행한 출력** — 예외 메시지가 콘솔에는 보인다.
 > 4. Windows **이벤트 뷰어 → Windows 로그 → 응용 프로그램**의 .NET Runtime 오류 항목.
 
-### Track A/B 러너 로그는 대상 소스 루트에 쌓인다
+### 자동수정 러너 로그는 대상 소스 루트에 쌓인다
 
-Track A/B 를 GUI 로 돌리면 러너가 `Run-SparrowSyntaxFix.<stamp>.log` / `Run-SparrowCommentFix.<stamp>.log` 를
+[코드 규칙]·[주석·레이아웃]을 GUI 로 돌리면 러너가 `Run-SparrowSyntaxFix.<stamp>.log` / `Run-SparrowCommentFix.<stamp>.log` 를
 **당신의 소스 루트**에 쓴다. GUI 가 러너의 `-LogDir` 로 **대상 경로에서 환원한 소스 루트**를 넘기기 때문이다
 (`%LOCALAPPDATA%` 가 아니다). 로그에는 규칙별 stdout 전문·exit 코드·커밋/게이트 판정이 들어간다.
 
@@ -255,9 +254,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyn
     -Solution C:\work\MyApp -Rules parens,obviousvar -LogDir C:\work\sparrow-logs -NoCommit
 ```
 
-### 2) Track C 실행 리포트 — 같은 폴더의 `trackc-<stamp>.json` + `trackc-<stamp>.log`
+### 2) [XLS 분리] 실행 리포트 — 같은 폴더의 `xlssplit-<stamp>.json` + `xlssplit-<stamp>.log`
 
-Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가 남는다(사람용 요약은 같은 이름의 `.log`).
+[XLS 분리]를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가 남는다(사람용 요약은 같은 이름의 `.log`).
 
 | 필드 | 뜻 |
 | --- | --- |
@@ -271,7 +270,7 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 | `scope` | `mismatch` + [범위 불일치]/[범위 경고] 원문 |
 | `warnings` | 병합 셀, 0건 매칭, `--max` 절단, 매핑 미실행, 지정 유실 등 |
 
-**리포트는 출력 폴더에 쓰지 않는다.** Track C 출력 폴더는 "체커 폴더 + 항목 md만, 부산물 0" 계약을 유지해야 하므로
+**리포트는 출력 폴더에 쓰지 않는다.** [XLS 분리] 출력 폴더는 "체커 폴더 + 항목 md만, 부산물 0" 계약을 유지해야 하므로
 리포트는 로그 폴더로 간다. CLI는 `--report <PATH>`를 줄 때만 만들고, 주지 않으면 **산출물이 바이트 동일**하다.
 
 ```powershell
@@ -295,7 +294,7 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 | --- | --- |
 | `uia-<stamp>\result.log` | UIA 하네스의 체크별 PASS/FAIL 전문(기대/실제 수치 포함) |
 | `uia-<stamp>\tree-<n>-<단계>-iter<i>.txt` | 단계별(메인창 로드 / 관리창 오픈 / 규칙 저장 / 지정 저장 / 실행 후 / 범위 좁힌 실행 후 / 코드 자동수정 화면) **UIA 트리 덤프**. 한 줄 = 한 요소: `ControlType \| id=… \| name=… \| Rect(x,y,w,h) \| Off=… \| En=… \| Val="…"` |
-| `uia-<stamp>\gui-logs\iter<i>\` | 그 실행에서 앱이 스스로 남긴 세션 로그 + Track C 리포트 |
+| `uia-<stamp>\gui-logs\iter<i>\` | 그 실행에서 앱이 스스로 남긴 세션 로그 + [XLS 분리] 리포트 |
 | `uia-<stamp>\shots\iter<i>\*.png` | **창 스냅샷** — 앱이 스스로 렌더한 실제 창 이미지(아래 4절) |
 | `uia-<stamp>\FAILURE-CONTEXT-iter<i>.txt` | 실패가 있을 때만 — 실패 목록 + 그 시점 트리 덤프 |
 | `validate-<stamp>.log` | `validate.ps1` 전체 출력(콘솔에도 그대로 나간다). 실패 시 마지막에 이 경로를 안내한다 |
@@ -325,7 +324,7 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 
 | 트리거 | 언제 | 파일명 지점 |
 | --- | --- | --- |
-| **자동** | 메인 창 로드 완료 / [체커 규칙 관리] 창 오픈 직후 / Track C 실행 완료 후(메인 창) | `main-loaded` · `manager-open` · `after-run` |
+| **자동** | 메인 창 로드 완료 / [체커 규칙 관리] 창 오픈 직후 / [XLS 분리] 실행 완료 후(메인 창) | `main-loaded` · `manager-open` · `after-run` |
 | **요청** | 스냅샷 폴더에 `capture.request` 파일이 생긴 순간 — **현재 활성(포커스) 창**을 즉시 캡처하고 요청 파일을 삭제한다 | 요청 파일 내용(비어 있으면 `request`) |
 | **요청(하네스가 넣는 것)** | 대분류 두 화면 · 관리창 · 지정 저장 후 · XLS 범위 체크 상태 | `req-main`(XLS 분리) · `req-fix-section`(코드 자동수정) · `req-manager` · `req-assign-saved` · `req-xls-scoped` |
 
@@ -374,7 +373,7 @@ foreach ($f in $files) {
 
 (위 구문검사는 `validate.ps1`이 이미 포함한다.)
 
-Track C 익스포터/G2 게이트를 바꾼 경우:
+[XLS 분리] 익스포터/G2 게이트를 바꾼 경우:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -IncludeG2GateTests

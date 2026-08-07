@@ -1,4 +1,4 @@
-// SparrowSyntaxFix: deterministic Roslyn source rewriter for Sparrow (파수 정적분석) Track A code-rule
+// SparrowSyntaxFix: deterministic Roslyn source rewriter for Sparrow (파수 정적분석) [코드 규칙] code-rule
 // residuals that `SparrowSyntaxFix` does not fully clear on the legacy MyApp (.NET Framework 4.7.2) project.
 //
 // RewriteEngine is the pure, IO-free core: parse source text with Roslyn syntax APIs, apply the enabled

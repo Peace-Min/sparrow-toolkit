@@ -71,7 +71,7 @@ namespace SparrowXlsExport.Core
         public int MergedRegions;
 
         /// <summary>Per-checker written-item counts (체커 키 -&gt; number of md written), ordinal by key. Diagnostic
-        /// only (fed to the Track C run report); computed in-memory and NEVER changes what is written to disk.</summary>
+        /// only (fed to the [XLS 분리] run report); computed in-memory and NEVER changes what is written to disk.</summary>
         public IReadOnlyList<(string Key, int Count)> CheckerCounts = Array.Empty<(string, int)>();
 
         /// <summary>
@@ -601,7 +601,7 @@ namespace SparrowXlsExport.Core
                     if (string.IsNullOrWhiteSpace(entry)) continue;
 
                     // Tier 0 index: keep the entry as written (only folded). No extension filter — the selection may
-                    // name C/C++/Java/... sources (Track C is language-agnostic).
+                    // name C/C++/Java/... sources ([XLS 분리] is language-agnostic).
                     string norm = NormalizePathForMatch(entry);
                     if (norm.Length > 0 && rawSelected.Add(norm) && rawDisplay.Count < 2) rawDisplay.Add(entry.Trim());
 

@@ -9,7 +9,7 @@
 // HARD RULE: logging is best-effort and must NEVER affect the app. Every filesystem call is swallowed; once a
 // write fails the file sink switches itself off and the screen log carries on untouched.
 //
-// Rotation: only the newest 20 session-*.log survive (and the newest 20 trackc-*.json run reports with their .log
+// Rotation: only the newest 20 session-*.log survive (and the newest 20 xlssplit-*.json run reports with their .log
 // companions), so an interactive tool cannot slowly fill the profile.
 // Encoding: UTF-8 WITHOUT BOM, CRLF (opened in Notepad by operators on Windows).
 
@@ -29,7 +29,7 @@ namespace SparrowRunner.Gui
         /// <summary>Session transcripts kept in the log folder (older ones are deleted at startup).</summary>
         private const int KeepSessions = 20;
 
-        /// <summary>Track C run reports (json + .log pairs) kept in the log folder.</summary>
+        /// <summary>[XLS 분리] run reports (json + .log pairs) kept in the log folder.</summary>
         private const int KeepReports = 20;
 
         private readonly object _gate = new object();
@@ -43,7 +43,7 @@ namespace SparrowRunner.Gui
             _sinkAlive = filePath != null;
         }
 
-        /// <summary>Folder holding session transcripts and Track C run reports (exists when <see cref="FilePath"/> is non-null).</summary>
+        /// <summary>Folder holding session transcripts and [XLS 분리] run reports (exists when <see cref="FilePath"/> is non-null).</summary>
         public string LogDirectory { get; }
 
         /// <summary>This session's transcript path, or null when the folder could not be created/written.</summary>
@@ -105,7 +105,7 @@ namespace SparrowRunner.Gui
 
             var log = new SessionLog(dir, path);
             log.Rotate("session-*.log", KeepSessions, deleteCompanionLog: false);
-            log.Rotate("trackc-*.json", KeepReports, deleteCompanionLog: true);
+            log.Rotate("xlssplit-*.json", KeepReports, deleteCompanionLog: true);
             return log;
         }
 
@@ -167,15 +167,15 @@ namespace SparrowRunner.Gui
             catch { _sinkAlive = false; }
         }
 
-        /// <summary>Path for this run's Track C report json inside the log folder (never the export output folder).
+        /// <summary>Path for this run's [XLS 분리] report json inside the log folder (never the export output folder).
         /// Returns null when there is no writable log folder.</summary>
-        public string? NewTrackCReportPath()
+        public string? NewXlsSplitReportPath()
         {
             if (FilePath == null) return null;
             try
             {
                 return Path.Combine(LogDirectory,
-                    "trackc-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".json");
+                    "xlssplit-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".json");
             }
             catch { return null; }
         }

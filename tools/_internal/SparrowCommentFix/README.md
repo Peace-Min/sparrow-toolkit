@@ -1,7 +1,7 @@
 # SparrowCommentFix
 
 Deterministic net8 console tool that fixes narrow **comment and layout** style issues flagged by the Sparrow
-(파수) static analyzer. It is the **Track B** deterministic fixer of the Sparrow pipeline: the mechanical,
+(파수) static analyzer. It is the **주석·레이아웃** deterministic fixer of the Sparrow pipeline: the mechanical,
 judgement-free comment clean-ups that a weak local/air-gapped LLM should never touch.
 
 It uses **Roslyn** (`Microsoft.CodeAnalysis.CSharp`) to parse each `.cs` file with
@@ -25,7 +25,7 @@ SparrowCommentFix <file.cs> [<file2.cs> ...] [--files-from <files.csv>] [--root 
 - `--files-from <csv>` reads a file list CSV (`파일명`/`경로`/`path`… column) or newline list and takes the **distinct `파일명`** values (CSV
   quoting handled). Paths are resolved against `--root` (default: current directory).
 - Positional files + `--files-from` files are **unioned, de-duplicated** by full path, order-stable.
-- `--rules` is **required**. Comma-separated keys, or `all` for all active Track B rules.
+- `--rules` is **required**. Comma-separated keys, or `all` for all active 주석·레이아웃 rules.
 - `--dry-run` computes and reports would-change counts but **writes nothing**.
 - A missing input file is a `WARN:` to stderr and is skipped; if **no** valid files remain, exit code `2`.
 
@@ -33,7 +33,7 @@ Exit codes: `0` success, `1` runtime error, `2` usage/validation error.
 
 ## Rules
 
-The active rule set covers deterministic Track B comment/layout fixes. Per the **code-fix-only** decision,
+The active rule set covers deterministic 주석·레이아웃 fixes. Per the **code-fix-only** decision,
 a rule with no safe deterministic contract is left unhandled rather than shipped as a wrong edit.
 
 | key | Sparrow checker | what it does | key guards |
@@ -151,5 +151,5 @@ air-gapped machine needs no .NET SDK and no NuGet restore. See
 
 ## Adding a rule
 
-See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-트랙에-규칙-추가) —
+See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-갈래에-규칙-추가) —
 it lists every touch point (rule implementation, rule-key registry, runner labels, GUI checkbox, fixtures).

@@ -29,7 +29,7 @@ Visual Studio 로 열려면 `SparrowRunner.Gui/SparrowRunner.Gui.sln` 을 연다
 ## 2. 빌드
 
 ```powershell
-# GUI + Track C 코어. 이 솔루션에 담긴 프로젝트는 이 둘뿐이다.
+# GUI + [XLS 분리] 코어. 이 솔루션에 담긴 프로젝트는 이 둘뿐이다.
 dotnet build SparrowRunner.Gui/SparrowRunner.Gui.sln -c Release
 
 # 엔진 CLI 3종은 솔루션에 없다 — 개별 빌드
@@ -38,7 +38,7 @@ dotnet build tools/_internal/SparrowCommentFix/SparrowCommentFix.csproj -c Relea
 dotnet build tools/_internal/SparrowXlsExport/SparrowXlsExport.csproj -c Release
 ```
 
-> A/B 러너는 엔진 exe/dll 이 없으면 스스로 증분 `dotnet build` 를 한다. 그래서 개발 중에는 개별 빌드를 생략해도 된다.
+> 자동수정 러너는 엔진 exe/dll 이 없으면 스스로 증분 `dotnet build` 를 한다. 그래서 개발 중에는 개별 빌드를 생략해도 된다.
 
 ### 폐쇄망 발행
 
@@ -49,7 +49,7 @@ dotnet build tools/_internal/SparrowXlsExport/SparrowXlsExport.csproj -c Release
 ```
 
 새 엔진을 추가했다면 이 스크립트의 `$projects` 배열에 반드시 등록한다 —
-등록하지 않으면 폐쇄망에서 그 트랙만 조용히 죽는다.
+등록하지 않으면 폐쇄망에서 그 갈래만 조용히 죽는다.
 
 ## 3. 테스트 (게이트)
 
@@ -62,8 +62,8 @@ dotnet build tools/_internal/SparrowXlsExport/SparrowXlsExport.csproj -c Release
 - **`-All` 은 GUI UIA 하네스를 포함한다.** 즉 `-All` 은 **진짜 WPF 창을 띄웠다 닫으며 수 분이 걸린다.**
   (`-IncludeGuiUiaTests` 는 그 부분만 따로 돌리는 스위치이지, `-All` 에서 빠져 있다는 뜻이 아니다.)
   창이 뜨는 게 곤란한 환경이면 개별 스위치로 나눠 돌린다.
-- **`CoreTests` 도 `-All` 에 포함된다**(`tests/coretests-run.ps1` 경유). "Track C 부산물 0" 의 가장 강한 단정이 여기 있다.
-- **`-All` 은 `tests/e2e-lab/run-e2e.ps1`(`-IncludeTrackCE2E`)을 포함하지 않는다.** 그 스크립트는 커밋된
+- **`CoreTests` 도 `-All` 에 포함된다**(`tests/coretests-run.ps1` 경유). "[XLS 분리] 부산물 0" 의 가장 강한 단정이 여기 있다.
+- **`-All` 은 `tests/e2e-lab/run-e2e.ps1`(`-IncludeXlsSplitE2E`)을 포함하지 않는다.** 그 스크립트는 커밋된
   골든 fixture(`tests/e2e-lab/sample-before.xls`, `sample-after.xls`)를 **재생성**해 작업 트리를 더럽힌다.
   일부러 돌렸다면 **fixture 변경을 원복**한 뒤 커밋한다.
 - 실 Sparrow xls 가 필요한 테스트는 입력이 없으면 자동 skip 한다(실패가 아니다). → [3.2](#32-실-sparrow-xls-를-쓰는-테스트--자동-탐색과-끄는-법)
@@ -126,13 +126,13 @@ xls 경로는 **아래 순서로 해석**된다.
 
 ## 4. 인코딩 규약 (이 레포에서 실제로 사고가 났다)
 
-`references/track-a-roslyn-policy.md` 가 **이중 인코딩(mojibake)** 으로 한글 본문의 3분의 1이 깨진 적이 있다.
+`references/code-rule-roslyn-policy.md` 가 **이중 인코딩(mojibake)** 으로 한글 본문의 3분의 1이 깨진 적이 있다.
 깨진 바이트는 `?` 로 치환돼 원문을 되돌릴 수 없었고(기계적 복구 불가), 결국 **살아남은 문맥과 실제 코드를
 근거로 사람이 다시 쓰는 것 말고는 방법이 없었다.** 그래서 이 규약은 강제다.
 
 - **모든 소스·문서는 UTF-8.**
 - **기존 파일을 편집할 때는 그 파일의 BOM 유무와 개행(CRLF/LF)을 그대로 유지한다.**
-  이 레포의 문서는 대부분 **UTF-8 BOM 없음 + LF** 다(`references/track-a-roslyn-policy.md` 만 BOM 있음).
+  이 레포의 문서는 대부분 **UTF-8 BOM 없음 + LF** 다(`references/code-rule-roslyn-policy.md` 만 BOM 있음).
   새 문서는 **UTF-8 BOM 없음 + LF** 로 만든다.
 - **편집 도구가 개행/BOM 을 바꾸지 않는지 확인한다.** 전체 파일이 통째로 diff 에 뜨면 십중팔구 개행이 바뀐 것이다.
 - **개행은 `.gitattributes` 가 고정한다.** 레포 루트의 `.gitattributes` 가 텍스트 파일의 개행을
@@ -161,7 +161,7 @@ xls 경로는 **아래 순서로 해석**된다.
 - **GUI 를 바꿨으면 UIA 하네스 단정을 갱신한다** (`tests/gui-uia-tests.ps1`). 탭을 추가/이름변경 했으면
   `$SUB_TABS` 와 하위 탭 개수 단정이 반드시 함께 바뀌어야 한다.
 - **문서를 함께 갱신한다.** 규칙을 추가했으면 해당 엔진의 `README.md` 규칙 표를,
-  트랙/화면을 바꿨으면 `README.md` 와 `docs/usage.md` 의 구성 표를 갱신한다.
+  갈래/화면을 바꿨으면 `README.md` 와 `docs/usage.md` 의 구성 표를 갱신한다.
   **틀린 문서는 없는 문서보다 나쁘다.**
 - **커밋은 작게, 한 커밋 = 한 가지.** 메시지에 **무엇을 왜** 를 적는다. 예:
 
@@ -206,7 +206,7 @@ xls 경로는 **아래 순서로 해석**된다.
 | 대상 | 이유 |
 |---|---|
 | `SKILL.md` (파일 존재 자체) | GUI 의 `ResolveSkillRoot()`, `validate.ps1` 의 소스 목록, `CoreTests` 가 이 파일을 **레포 루트 마커**로 쓴다. 내용은 고쳐도 되지만 **파일을 지우거나 옮기면 GUI 가 스킬 루트를 못 찾는다** |
-| Track C 출력 폴더 계약 | "체커 키 폴더 + 항목 md 만, 부산물 0". 리포트·인덱스·요약을 출력 폴더에 쓰는 변경은 받지 않는다 |
+| [XLS 분리] 출력 폴더 계약 | "체커 키 폴더 + 항목 md 만, 부산물 0". 리포트·인덱스·요약을 출력 폴더에 쓰는 변경은 받지 않는다 |
 | `SourceFileIo` 의 BOM/개행 보존 · 원자적 쓰기 | 남의 소스를 손상시키지 않겠다는 이 도구의 기본 약속이다 |
 | 문자열 리터럴·주석 안전성 | 자동수정이 문자열 안의 `//`·`&&` 를 건드리면 그 순간 이 도구는 못 쓰는 물건이 된다 |
 | 전건 정책 | 심각도/체커로 검출을 미리 버리지 않는다. 필터를 추가하려면 먼저 이슈로 논의한다 |

@@ -11,7 +11,7 @@ using SparrowXlsExport.Core;
 namespace SparrowRunner.Gui
 {
     /// <summary>
-    /// The separate [체커 규칙 관리] window (opened from the main Track C tab). Two areas:
+    /// The separate [체커 규칙 관리] window (opened from the main [XLS 분리] tab). Two areas:
     ///   A. 규칙 라이브러리  — named-rule CRUD (list + name box + editor; [새 규칙]/[규칙 저장]/[삭제]/rename).
     ///                        xls-independent; edits the "&lt;이름&gt;.md" files under the guides directory.
     ///   B. 체커 매핑        — one row per detected checker (key + count + rule ComboBox incl. "— 없음 —").

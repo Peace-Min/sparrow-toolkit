@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    GROUNDED real-pattern regression for the Sparrow Track A (SparrowSyntaxFix) + Track B (SparrowCommentFix)
+    GROUNDED real-pattern regression for the Sparrow [코드 규칙] (SparrowSyntaxFix) + [주석·레이아웃] (SparrowCommentFix)
     pipeline. Unlike sparrow-loop-tests.ps1 (which targets three specific fixed rules), this harness seeds ONE
     COMPILABLE net8.0 file carrying the REAL code shapes flagged in the actual MyApp Sparrow xls, runs the full
     canonical two-tool pipeline over it, and asserts:
@@ -191,7 +191,7 @@ try {
     Write-Host ""
     Write-Host "  --- per-pattern (real MyApp shapes) ---"
 
-    # Track A
+    # [코드 규칙]
     Check "A nullvar: SampleComponent=null -> var (SampleComponent)null"        { Has "var sampleComponent = (SampleComponent)null;" }
     Check "A objectvar-safe: new SampleEntity() -> var"                  { Has "var parentData = new SampleEntity();" }
     Check "A objectvar-safe SKIP: IDictionary=ExpandoObject UNCHANGED"        { Has "System.Collections.Generic.IDictionary<string, object> expando = new System.Dynamic.ExpandoObject();" }
@@ -202,7 +202,7 @@ try {
     Check "A foreachcast(XmlNode, member-access): Cast<XmlNode>"              { Has "foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(xmlDoc.ChildNodes))" }
     Check "A foreachcast(DataColumn): Cast<DataColumn>"                       { Has "foreach (var col in System.Linq.Enumerable.Cast<DataColumn>(dt.Columns))" }
 
-    # Track B
+    # [주석·레이아웃]
     Check "B space: //test -> // Test. (space + cap + period)"                { Has "// Test." }
     Check "B trailing: //note promoted ABOVE as // Note."                     { Has "// Note.$nl            var aa = 0;" }
     Check "B period ')'-ending: Miss Distance(...)."                          { Has "// Miss Distance(Min/Max/Avg)." }

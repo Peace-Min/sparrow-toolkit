@@ -16,22 +16,22 @@
 param(
     [string]$RepositoryRoot = $PSScriptRoot,
     [switch]$All,
-    [switch]$IncludeSparrowE2E,                     # SparrowXlsExport (Track C export)
+    [switch]$IncludeSparrowE2E,                     # SparrowXlsExport ([XLS 분리] export)
     [switch]$IncludeSparrowMappingTests,            # SparrowXlsExport --guides (checker→rule self-contained 부착)
-    [switch]$IncludeSyntaxFixE2E,                   # SparrowSyntaxFix (Track A)
-    [switch]$IncludeCommentE2E,                     # SparrowCommentFix (Track B)
+    [switch]$IncludeSyntaxFixE2E,                   # SparrowSyntaxFix ([코드 규칙])
+    [switch]$IncludeCommentE2E,                     # SparrowCommentFix ([주석·레이아웃])
     [switch]$IncludeSparrowLoopTests,               # cross-rule loop / idempotency / compile
     [switch]$IncludeSparrowRealPatternTests,        # grounded real-MyApp-pattern pipeline regression
     [switch]$IncludeSparrowRealXlsC3Tests,          # real-xls C3 detect+fix
     [switch]$IncludeSparrowRealXlsForHoistTests,    # real-xls forhoist detect+fix
     [switch]$IncludeSparrowRealXlsContinuationDeepTests, # real-xls deep-continuation normalize
     [switch]$IncludeSparrowRealXlsBlockPromoteTests,# real-xls blockpromote detect+fix
-    [switch]$IncludeSparrowRealXlsScopeLoopTests,   # real-xls Track C scope-selection loop (cross-PC)
-    [switch]$IncludeSparrowExhaustiveXls,           # exhaustive Track A/B over the REAL MyApp xls
+    [switch]$IncludeSparrowRealXlsScopeLoopTests,   # real-xls [XLS 분리] scope-selection loop (cross-PC)
+    [switch]$IncludeSparrowExhaustiveXls,           # exhaustive [코드 규칙]·[주석·레이아웃] over the REAL MyApp xls
     [switch]$IncludeG2GateTests,                    # Compare-Sparrow G2 게이트 시나리오
-    [switch]$IncludeCoreTests,                      # SparrowXlsExport.Core\CoreTests (Core 출력 계약 + Track C 부산물 0)
-    [switch]$IncludeTrackCE2E,                      # tests\e2e-lab: 익스포터 -> 수정+빌드(G1) -> G2 파이프라인
-    [switch]$IncludeGuiUiaTests,                    # tools\SparrowRunner.Gui: Track C 매핑 패널 UIA 하네스(창이 잠깐 뜸)
+    [switch]$IncludeCoreTests,                      # SparrowXlsExport.Core\CoreTests (Core 출력 계약 + [XLS 분리] 부산물 0)
+    [switch]$IncludeXlsSplitE2E,                    # tests\e2e-lab: 익스포터 -> 수정+빌드(G1) -> G2 파이프라인
+    [switch]$IncludeGuiUiaTests,                    # tools\SparrowRunner.Gui: [XLS 분리] 매핑 패널 UIA 하네스(창이 잠깐 뜸)
     [string]$LogDir                                 # 트랜스크립트 폴더 (기본 <repo>\tests\_logs)
 )
 
@@ -45,13 +45,13 @@ if ($All) {
     $IncludeSparrowRealXlsScopeLoopTests = $IncludeSparrowExhaustiveXls = $true
     $IncludeG2GateTests = $true
     # CoreTests 는 합성 픽스처만 쓰는 in-process 하네스(실 xls 불필요)라 -All 에 항상 포함한다.
-    # "Track C 부산물 0" 의 가장 강한 단정이 여기 있으므로 PR 게이트 밖에 두면 안 된다.
+    # "[XLS 분리] 부산물 0" 의 가장 강한 단정이 여기 있으므로 PR 게이트 밖에 두면 안 된다.
     $IncludeCoreTests = $true
     # GUI UIA 하네스는 -All 에 포함한다. 실제 WPF 창을 잠깐 띄워 UIA 로 구동하고 종료한다(앱이 스스로 자기 창을
     # tests\_logs\uia-*\shots\ 에 PNG 로 렌더한다 — 외부 스크린샷 도구는 쓰지 않는다).
     # 임시 --guides-dir 로 실 캐시를 건드리지 않으며, .NET SDK/UIA/데스크톱 세션이 없으면 self-skip 이라 안전하다.
     $IncludeGuiUiaTests = $true
-    # 주의: -IncludeTrackCE2E 는 -All 에 포함하지 않는다. e2e-lab 은 커밋된 골든 fixture
+    # 주의: -IncludeXlsSplitE2E 는 -All 에 포함하지 않는다. e2e-lab 은 커밋된 골든 fixture
     # (sample-before/after.xls)를 재생성하므로 작업 트리를 더럽힐 수 있다. 필요할 때만 명시 실행.
 }
 
@@ -103,7 +103,7 @@ $toolSources = @(
     "tools\_internal\SparrowXlsExport.Core\SparrowExporter.cs",
     "tools\_internal\SparrowXlsExport.Core\CheckerRuleMapper.cs",
     "tools\_internal\SparrowXlsExport.Core\CheckerRuleStore.cs",
-    "tools\_internal\SparrowXlsExport.Core\TrackCRunReport.cs",
+    "tools\_internal\SparrowXlsExport.Core\XlsSplitRunReport.cs",
     "tools\_internal\SparrowXlsExport.Core\CoreTests\CoreTests.csproj",
     "tools\_internal\SparrowXlsExport.Core\CoreTests\Program.cs",
     "tools\_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj",
@@ -154,7 +154,7 @@ $tests = @{
     Exhaustive       = "tests\sparrow-exhaustive-xls-test.ps1"
     G2Gate           = "tests\g2-gate-tests.ps1"
     CoreTests        = "tests\coretests-run.ps1"
-    TrackCE2E        = "tests\e2e-lab\run-e2e.ps1"
+    XlsSplitE2E      = "tests\e2e-lab\run-e2e.ps1"
     GuiUia           = "tests\gui-uia-tests.ps1"
 }
 foreach ($k in $tests.Keys) {
@@ -245,7 +245,7 @@ Run-Test $IncludeSparrowRealXlsScopeLoopTests      $tests.RealXlsScopeLoop
 Run-Test $IncludeSparrowExhaustiveXls              $tests.Exhaustive
 Run-Test $IncludeG2GateTests                       $tests.G2Gate
 Run-Test $IncludeCoreTests                         $tests.CoreTests
-Run-Test $IncludeTrackCE2E                         $tests.TrackCE2E
+Run-Test $IncludeXlsSplitE2E                       $tests.XlsSplitE2E
 Run-Test $IncludeGuiUiaTests                       $tests.GuiUia
 
 # ---- 4. 집계 요약 ----

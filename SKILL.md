@@ -21,10 +21,10 @@ auto-fixed where that is deterministic, and split per checker where a human or a
 
 ## What the toolkit does (one paragraph)
 
-Three tracks. **A** (`SparrowSyntaxFix`) and **B** (`SparrowCommentFix`) are deterministic Roslyn
-*syntax-only* rewriters for C# coding-rule and comment/layout findings — they never load or compile a
-project, so they work on legacy non-SDK `.csproj` targets. **C** (`SparrowXlsExport`) is a
-language-agnostic exporter: one folder per checker key, one Markdown file per finding, **zero
+Three things. **Code rules** (`SparrowSyntaxFix`) and **comments/layout** (`SparrowCommentFix`) are
+deterministic Roslyn *syntax-only* rewriters for C# coding-rule and comment/layout findings — they never
+load or compile a project, so they work on legacy non-SDK `.csproj` targets. **XLS split**
+(`SparrowXlsExport`) is a language-agnostic exporter: one folder per checker key, one Markdown file per finding, **zero
 byproducts**, no prerequisite documents. A WPF GUI (`tools/Run-SparrowRunnerGui.cmd`) drives all three.
 Every Sparrow finding stays a work item — nothing is dropped as a false positive unless the user says so.
 
@@ -35,8 +35,8 @@ Every Sparrow finding stays a work item — nothing is dropped as a false positi
 | GUI (권장) | `tools/Run-SparrowRunnerGui.cmd` |
 | Visual Studio | `SparrowRunner.Gui/SparrowRunner.Gui.sln` |
 | Console, A→B 순차 | `tools/Run-SparrowAll.cmd` |
-| Track A/B 러너 직접 | `tools/_internal/SparrowSyntaxFix/Run-SparrowSyntaxFix.ps1`, `tools/_internal/SparrowCommentFix/Run-SparrowCommentFix.ps1` |
-| Track C CLI 직접 | `tools/_internal/SparrowXlsExport` |
+| [코드 규칙]·[주석·레이아웃] 러너 직접 | `tools/_internal/SparrowSyntaxFix/Run-SparrowSyntaxFix.ps1`, `tools/_internal/SparrowCommentFix/Run-SparrowCommentFix.ps1` |
+| [XLS 분리] CLI 직접 | `tools/_internal/SparrowXlsExport` |
 | 전/후 회귀 게이트 (G2) | `tools/Compare-Sparrow.ps1 -Before before.xls -After after.xls` |
 
 Normal operation goes through the GUI or the runner prompts. Direct `-Rules` / `--rules` use is
@@ -44,18 +44,18 @@ reserved for tests, automation, and precise re-runs.
 
 ## Language support
 
-- **Track A/B are C#-only** (Roslyn C# parser). They cannot be used on C, C++, or other languages.
-- **Track C is language-agnostic** — it never reads the XLS `언어` column and copies the source cell
+- **[코드 규칙]·[주석·레이아웃] are C#-only** (Roslyn C# parser). They cannot be used on C, C++, or other languages.
+- **[XLS 분리] is language-agnostic** — it never reads the XLS `언어` column and copies the source cell
   verbatim without parsing.
-- A **C/C++ project therefore uses Track C only** today. To add C/C++ auto-fixing, follow
-  [docs/extending.md 레시피 2](docs/extending.md#레시피-2-새-언어-트랙-추가-cc-예시).
+- A **C/C++ project therefore uses [XLS 분리] only** today. To add C/C++ auto-fixing, follow
+  [docs/extending.md 레시피 2](docs/extending.md#레시피-2-새-언어-갈래-추가-cc-예시).
 
 ## Rules of engagement
 
 - **Do not auto-edit target source for judgment-required findings.** The exported item md is input for
   the developer or LLM working against the real source tree.
 - **Do not drop findings as false positives** unless the user explicitly changes the policy.
-- **Never write anything besides checker folders and item md into a Track C output folder.**
+- **Never write anything besides checker folders and item md into a [XLS 분리] output folder.**
 - Checker-specific fix guidance is **not shipped by this repo**. It is a local, gitignored named-rule
   library under `references/checkers/` with **explicit** checker assignments (no name-based auto-mapping).
 - Do not copy closed-network source code, full functions, or business logic into this repo. Anonymized

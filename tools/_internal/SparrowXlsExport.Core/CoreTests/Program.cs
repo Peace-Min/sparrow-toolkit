@@ -912,7 +912,7 @@ internal static class Program
     }
 
     // ---- R. 실행 리포트 출력-트리 가드 -------------------------------------------------------------
-    // Track C 출력 계약은 "체커 폴더 + 항목 md만, 부산물 0" 이고 TrackCRunReport 헤더도 "리포트는 절대 출력
+    // [XLS 분리] 출력 계약은 "체커 폴더 + 항목 md만, 부산물 0" 이고 XlsSplitRunReport 헤더도 "리포트는 절대 출력
     // 폴더에 안 들어간다"고 못박는다. 그런데 예전 TryWrite 는 호출자를 믿기만 하고 가드가 없었고, 오히려
     // 부모 폴더를 만들어 줬다 → `--out X --report X\r.json`(또는 GUI --log-dir 을 출력 폴더로 지정)이면
     // json + 동반 .log 2개가 출력 트리에 생겨 계약이 조용히 깨졌다. 이제 거부한다.
@@ -921,31 +921,31 @@ internal static class Program
     {
         string outDir = Path.Combine(work, "r-out");
         Directory.CreateDirectory(outDir);
-        var report = new TrackCRunReport { OutDir = outDir };
+        var report = new XlsSplitRunReport { OutDir = outDir };
 
         string inside = Path.Combine(outDir, "run-report.json");
-        Check(!TrackCReportWriter.TryWrite(inside, report, out string? errInside),
+        Check(!XlsSplitReportWriter.TryWrite(inside, report, out string? errInside),
               "R: 출력 폴더 안 리포트 경로는 거부");
         Check(errInside != null && errInside.Contains("report=", StringComparison.Ordinal)
                                 && errInside.Contains("out=", StringComparison.Ordinal),
               "R: 거부 사유에 report/out 실제 경로가 담긴다", errInside ?? "(null)");
-        Check(!File.Exists(inside) && !File.Exists(TrackCReportWriter.CompanionLogPath(inside)),
+        Check(!File.Exists(inside) && !File.Exists(XlsSplitReportWriter.CompanionLogPath(inside)),
               "R: 거부 시 json 도 동반 .log 도 만들지 않는다");
 
         string deep = Path.Combine(outDir, "logs", "run-report.json");
-        Check(!TrackCReportWriter.TryWrite(deep, report, out _), "R: 출력 폴더 '하위' 경로도 거부");
+        Check(!XlsSplitReportWriter.TryWrite(deep, report, out _), "R: 출력 폴더 '하위' 경로도 거부");
         Check(!Directory.Exists(Path.Combine(outDir, "logs")),
               "R: 거부 시 출력 폴더 밑에 폴더조차 만들지 않는다");
 
-        Check(!TrackCReportWriter.TryWrite(outDir, report, out _), "R: 출력 폴더 경로 자체도 거부");
+        Check(!XlsSplitReportWriter.TryWrite(outDir, report, out _), "R: 출력 폴더 경로 자체도 거부");
         Check(Directory.GetFileSystemEntries(outDir).Length == 0,
               "R: 거부 3회 뒤에도 출력 폴더는 완전히 비어 있다(부산물 0)");
 
         // 과잉 차단 금지: 이름이 출력 폴더로 '시작만' 하는 형제 폴더(r-out-logs)는 정상 기록돼야 한다.
         string sibling = Path.Combine(work, "r-out-logs", "run-report.json");
-        Check(TrackCReportWriter.TryWrite(sibling, report, out string? errSibling),
+        Check(XlsSplitReportWriter.TryWrite(sibling, report, out string? errSibling),
               "R: 접두만 같은 형제 폴더는 정상 기록(과잉 차단 아님)", errSibling ?? "");
-        Check(File.Exists(sibling) && File.Exists(TrackCReportWriter.CompanionLogPath(sibling)),
+        Check(File.Exists(sibling) && File.Exists(XlsSplitReportWriter.CompanionLogPath(sibling)),
               "R: 정상 경로에는 json + 동반 .log 를 쓴다");
         Check(Directory.GetFileSystemEntries(outDir).Length == 0,
               "R: 형제 폴더에 기록해도 출력 폴더는 그대로 비어 있다");

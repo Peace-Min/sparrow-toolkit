@@ -14,7 +14,7 @@
    L1   │  SparrowRunner.Gui   (WPF · net8.0-windows)              │
         │  대분류/하위 탭 · 범위 트리 · 규칙 체크박스 · 공유 로그창   │
         └───────┬───────────────────────────────────┬──────────────┘
-                │ ① 프로세스 경계 (Track A/B)        │ ② 라이브러리 경계 (Track C)
+                │ ① 프로세스 경계 (자동수정)         │ ② 라이브러리 경계 (XLS 분리)
                 │   powershell.exe <러너>.ps1        │   ProjectReference 로 직접 호출
                 ▼                                   ▼
         ┌──────────────────────────────┐   ┌────────────────────────────────┐
@@ -36,22 +36,22 @@
 | 이유 | 효과 |
 |---|---|
 | **엔진 교체 자유** | GUI 는 러너를 `powershell.exe` 로 실행하고 stdout 을 로그창에 흘릴 뿐이다. 엔진이 C#이든 C++이든 Python이든 GUI 코드는 모른다. |
-| **언어 확장** | 새 언어 트랙은 **새 엔진 + 새 러너**만 만들면 된다. GUI 는 탭 하나와 러너 경로 한 줄만 늘어난다. |
+| **언어 확장** | 새 언어 갈래는 **새 엔진 + 새 러너**만 만들면 된다. GUI 는 탭 하나와 러너 경로 한 줄만 늘어난다. |
 | **폐쇄망 배포 자유도** | 엔진이 별도 exe 라서 `publish-airgap.ps1` 로 각각 self-contained 발행해 파일 복사만으로 반입된다. 러너는 `-ExePath` / `publish\` 로 반입 exe 를 집어 쓰므로 대상 PC 에 SDK·NuGet 이 필요 없다. |
 | **파괴적 작업 격리** | 소스를 실제로 고치는 건 엔진 프로세스다. 크래시가 GUI 를 죽이지 않고, 러너가 규칙 단위로 커밋/revert 를 관리할 수 있다. |
 
-Track C 만 예외적으로 **라이브러리 경계**다(GUI 안에서 `SparrowXlsExport.Core` 를 직접 호출).
+[XLS 분리]만 예외적으로 **라이브러리 경계**다(GUI 안에서 `SparrowXlsExport.Core` 를 직접 호출).
 읽기 전용이고, 진행 상황을 로그창에 실시간으로 흘리며, 산출물 통계를 그대로 리포트로 만들어야 해서
 프로세스를 나눌 이득이 없었다. 같은 코어를 `SparrowXlsExport` CLI 도 쓰므로 코드 중복은 없다.
 
-> **새 언어 트랙은 둘 중 아무 쪽이나 골라도 된다.** 프로세스 경계(A/B 방식)가 기본 권장이다 —
+> **새 언어 갈래는 둘 중 아무 쪽이나 골라도 된다.** 프로세스 경계(자동수정 방식)가 기본 권장이다 —
 > 엔진 기술 선택이 완전히 자유롭고, 폐쇄망 발행 경로가 이미 있다.
 
 ---
 
 ## 2. 러너 CLI 계약 — **확장의 이음매**
 
-GUI 는 Track A/B 실행 시 러너 `.ps1` 에 **아래 인자만** 넘긴다
+GUI 는 [코드 규칙]·[주석·레이아웃] 실행 시 러너 `.ps1` 에 **아래 인자만** 넘긴다
 (`tools/SparrowRunner.Gui/MainWindow.xaml.cs` 의 `BuildJobs()`).
 **이 계약을 지키는 `.ps1` 이면 GUI 에 그대로 붙는다.**
 
@@ -59,7 +59,7 @@ GUI 는 Track A/B 실행 시 러너 `.ps1` 에 **아래 인자만** 넘긴다
 |---|---|---|
 | `-Solution <경로>` | `.sln` / `.csproj` / 폴더 | 대상. 러너는 **`.sln`/`.csproj` 파일이면 `Split-Path -Parent` 로 그 폴더로 환원**하고, 폴더면 그대로 소스 루트로 쓴다 |
 | `-Rules <a,b,c>` | 콤마 구분 규칙 키 | GUI 체크박스에서 켠 규칙들. 러너가 규칙마다 엔진을 한 번씩 돌린다 |
-| `-LogDir <경로>` | 폴더 | 러너 실행 로그(`Run-<이름>.<stamp>.log`)를 쓸 곳. **GUI 는 대상 소스 루트를 준다** — 즉 사용자 레포에 로그가 쌓이고, 러너가 그걸 쓴 뒤 `git status` 를 돌려 "미커밋 변경" 경고를 스스로 유발한다([usage.md](usage.md#track-ab-러너-로그는-대상-소스-루트에-쌓인다)). 기존 러너는 이 폴더를 **만들지 않는다** — 없으면 `[FATAL]` 로 죽는다 |
+| `-LogDir <경로>` | 폴더 | 러너 실행 로그(`Run-<이름>.<stamp>.log`)를 쓸 곳. **GUI 는 대상 소스 루트를 준다** — 즉 사용자 레포에 로그가 쌓이고, 러너가 그걸 쓴 뒤 `git status` 를 돌려 "미커밋 변경" 경고를 스스로 유발한다([usage.md](usage.md#자동수정-러너-로그는-대상-소스-루트에-쌓인다)). 기존 러너는 이 폴더를 **만들지 않는다** — 없으면 `[FATAL]` 로 죽는다 |
 | `-FilesFrom <파일>` | CSV 또는 줄 목록 | 범위 트리에서 고른 파일 목록(manifest). **빈 목록이거나 소스 루트 밖 파일뿐이면 전체로 확대하지 않고 실패해야 한다** |
 | `-Commit` \| `-NoCommit` | (스위치) | GUI 의 [규칙별 커밋 생성] 체크 상태에 따라 **둘 중 하나가 반드시** 온다 |
 
@@ -98,7 +98,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\_internal\SparrowSyn
 
 ---
 
-## 3. Track A/B 내부 — 구문 전용 재작성
+## 3. [코드 규칙]·[주석·레이아웃] 내부 — 구문 전용 재작성
 
 ### 3.1 핵심 성질: 프로젝트를 로드하지도 컴파일하지도 않는다
 
@@ -160,7 +160,7 @@ GUI 의 범위 트리는 선택 파일을 임시 CSV manifest 로 떨어뜨리�
 
 ---
 
-## 4. Track C 내부 — xls → 체커별 md
+## 4. [XLS 분리] 내부 — xls → 체커별 md
 
 ### 4.1 순수성 계약 (절대 어기지 말 것)
 
@@ -188,9 +188,9 @@ GUI 의 범위 트리는 선택 파일을 임시 CSV manifest 로 떨어뜨리�
 익스포터는 xls 의 `언어` 컬럼을 **읽지 않고**, 소스 코드 셀을 **파싱하지 않고 문자열 그대로** 옮긴다.
 경로 매칭도 문자열 비교다. 그래서 C·C++·C#·Java 어떤 언어의 검출이든 **오늘 그대로 동작한다.**
 
-> 새 언어 트랙을 추가하는 기여자는 **Track C 를 손댈 필요가 전혀 없다.**
+> 새 언어 갈래를 추가하는 기여자는 **[XLS 분리]를 손댈 필요가 전혀 없다.**
 
-### 4.3 Track C 범위 매칭 (Tier 0~3)
+### 4.3 [XLS 분리] 범위 매칭 (Tier 0~3)
 
 공유 xls 하나(예: PC-A 의 `D:\Work\Proj\...` 경로)를 팀이 나눠 고칠 때, 경로 기준이 서로 다르면
 범위 필터가 조용히 빈 결과를 낼 수 있다. 그래서 매칭이 네 단계다.
@@ -233,7 +233,7 @@ sparrow-toolkit/
 
   docs/
     architecture.md              # 이 문서
-    extending.md                 # 규칙 추가 / 새 언어 트랙 추가 레시피
+    extending.md                 # 규칙 추가 / 새 언어 갈래 추가 레시피
     usage.md                     # 운영자 사용 안내
 
   SparrowRunner.Gui/
@@ -242,17 +242,17 @@ sparrow-toolkit/
 
   tools/
     Run-SparrowRunnerGui.cmd     # GUI 실행(발행본 있으면 그걸, 없으면 dotnet run)
-    Run-SparrowAll.cmd/.ps1      # GUI 없이 Track A→B 순차 실행
+    Run-SparrowAll.cmd/.ps1      # GUI 없이 [코드 규칙]→[주석·레이아웃] 순차 실행
     Compare-Sparrow.ps1          # 전/후 xls 비교 G2 회귀 게이트
     publish-airgap.ps1           # 폐쇄망 반입 발행(도구 4종)
     README.md                    # tools/ 진입점 안내
     SparrowRunner.Gui/           # WPF GUI 소스 (MainWindow.xaml(.cs), RuleManagerWindow, Scope*, SessionLog, WindowSnapshot…)
     _internal/
-      SparrowSyntaxFix/          # Track A 엔진: Program.cs, RewriteEngine.cs, *Rewriter.cs(규칙 하나 = 파일 하나),
+      SparrowSyntaxFix/          # [코드 규칙] 엔진: Program.cs, RewriteEngine.cs, *Rewriter.cs(규칙 하나 = 파일 하나),
                                  #   FileDiscovery.cs, SourceFileIo.cs, VarRewriteHelpers.cs, Run-*.ps1, FixtureTests/
-      SparrowCommentFix/         # Track B 엔진: Program.cs(규칙 전부), Run-*.ps1
-      SparrowXlsExport/          # Track C CLI (+ FixtureGen/)
-      SparrowXlsExport.Core/     # Track C 코어: SparrowExporter, CheckerRuleMapper/Store, TrackCRunReport (+ CoreTests/)
+      SparrowCommentFix/         # [주석·레이아웃] 엔진: Program.cs(규칙 전부), Run-*.ps1
+      SparrowXlsExport/          # [XLS 분리] CLI (+ FixtureGen/)
+      SparrowXlsExport.Core/     # [XLS 분리] 코어: SparrowExporter, CheckerRuleMapper/Store, XlsSplitRunReport (+ CoreTests/)
 
   tests/                         # 회귀 테스트(아래 6절)
   references/                    # 참고 자료(설계 정책·측정 기록·실사례 패턴). 실행에 필요한 파일은 없음
@@ -272,7 +272,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1        # 빌�
 powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전체 opt-in E2E (빌드+실행, .NET SDK 필요) — 실제 WPF 창이 뜨고 수 분
 ```
 
-- 개별 스위치로 트랙별 실행 가능(`-IncludeSyntaxFixE2E`, `-IncludeCommentE2E`, `-IncludeSparrowE2E`,
+- 개별 스위치로 갈래별 실행 가능(`-IncludeSyntaxFixE2E`, `-IncludeCommentE2E`, `-IncludeSparrowE2E`,
   `-IncludeSparrowMappingTests`, `-IncludeG2GateTests`, `-IncludeCoreTests`, `-IncludeGuiUiaTests` …).
 - **`-All` 은 `-IncludeGuiUiaTests` 와 `-IncludeCoreTests` 를 포함한다.** 따라서 `-All` 은
   **진짜 WPF 창을 띄웠다 닫으며 수 분이 걸린다.** 개별 스위치는 그 부분만 따로 돌릴 때 쓰는 것이지,
@@ -282,7 +282,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전�
   **0 이 아닌 코드로 종료**한다. **전부 스킵이면 "E2E 단정 0개 실행" 경고**가 뜬다 — 그 실행은 게이트가 아니다.
   자식 테스트의 신호 규약(성공 `exit 0` / 실패 `throw`·`exit≠0` / 스킵 `$global:SparrowTestSkip`)은
   [CONTRIBUTING.md 3.1](../CONTRIBUTING.md#31-게이트-결과-읽는-법--새-테스트를-추가할-때의-신호-규약) 참조.
-- **`-All` 은 `-IncludeTrackCE2E` 를 포함하지 않는다** — `tests/e2e-lab/run-e2e.ps1` 은 커밋된 골든 fixture
+- **`-All` 은 `-IncludeXlsSplitE2E` 를 포함하지 않는다** — `tests/e2e-lab/run-e2e.ps1` 은 커밋된 골든 fixture
   (`sample-before.xls`/`sample-after.xls`)를 재생성해 작업 트리를 더럽힌다. 돌렸으면 fixture 변경을 원복할 것.
 - 실 Sparrow xls 파일이 필요한 테스트는 입력이 없으면 **자동 skip**(실패가 아니다). 그런 테스트는 둘뿐이다(6.2 참조).
 
@@ -315,7 +315,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전�
 
 - 대분류 전환이 실제로 화면을 바꾸는가(반대편 전용 컨트롤이 UIA 트리에서 사라지는가).
 - **하위 탭 개수·라벨·순서** (`$SUB_TABS = @('코드 규칙', '주석·레이아웃')`) — **새 탭을 추가하면 여기를 갱신해야 한다.**
-- 화면 텍스트에 내부 명칭(`Track A`/`Track B`)이 하나도 없는가.
+- 화면 텍스트에 내부 식별자(`CodeRuleTab`/`CommentTab`)가 하나도 새어 나오지 않는가.
 - 자동 매핑 없음: 체커 키와 같은 이름의 규칙 파일이 있어도 지정 전에는 붙지 않는가.
 - 범위 트리가 xls 자기 경로로 만들어지고, 폴더 하나만 체크하면 정확히 그 폴더만 나오는가.
 - GUI 가 러너에 `-Commit`/`-NoCommit` 을 넘기고 `-DryRun`/`-IncludeGenerated` 는 넘기지 않는가.
@@ -346,7 +346,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\validate.ps1 -All   # 전�
 | `.sln` 파싱 | GUI 의 프로젝트 트리는 `.sln` 안의 일반 C# 프로젝트 라인을 기준으로 만든다. **Solution Folder / Shared Project / 특수 SDK 포맷은 미지원** — 필요하면 `SourceScopeDiscovery` 를 확장한다. |
 | 프로젝트 중복 | 같은 물리 폴더를 여러 `.csproj` 가 참조하면 트리에 파일이 중복 표시될 수 있다. 선택 manifest 는 중복을 제거하므로 실행은 중복되지 않는다. |
 | git 버전 | 러너의 작업범위 격리는 `git commit --only --pathspec-from-file --pathspec-file-nul` 에 의존한다. 이 조합은 **git 2.25 이상**에서 쓸 수 있고, **2.45.1 에서 `-Commit`·게이트 테스트 전부 통과를 실측**했다. 그보다 오래된 git 은 지원 여부 확인 필요. |
-| Track C basename 매칭 | Tier 3 는 **의도적으로 보수적**이다. xls `경로` 가 비어 있고 동명 파일이 여럿이면 추측하지 않고 제외한다. |
+| [XLS 분리] basename 매칭 | Tier 3 는 **의도적으로 보수적**이다. xls `경로` 가 비어 있고 동명 파일이 여럿이면 추측하지 않고 제외한다. |
 | 스캔 접근 실패 | 권한 등으로 못 읽은 디렉터리는 아직 UI 경고로 표시하지 않는다. 필요하면 `SourceScopeDiscovery` 에 skipped count/message 를 추가한다. |
 | Roslyn ≠ Sparrow | **Roslyn 편집이 Sparrow 검출 소멸을 보장하지 않는다.** AST 경계가 서로 다르다. 진짜 게이트는 **Sparrow 재분석**(G2)이다. 자동수정 → 빌드(G1) → 재분석(G2) → 사람 리뷰(G3) 순으로 확인한다. |
 | 측정 위생 | 전/후 xls 델타는 **반드시 동일 체크아웃·동일 경로 집합**으로 스캔해야 의미가 있다. 파일명만으로 매칭하면 다중 프로젝트 동명 파일이 뭉쳐 오판을 부른다(실제 사고 사례: [references/RESULTS-6869-analysis.md](../references/RESULTS-6869-analysis.md)). |

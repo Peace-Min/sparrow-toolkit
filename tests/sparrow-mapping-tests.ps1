@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    Opt-in end-to-end test for the Track C checker->rule MAPPING layer (--guides). NOT run by the default
+    Opt-in end-to-end test for the [XLS 분리] checker->rule MAPPING layer (--guides). NOT run by the default
     validate gate (needs the .NET SDK + NPOI restore). Run manually or via `validate.ps1 -IncludeSparrowMappingTests`.
 
     It builds FixtureGen + the tool, generates the synthetic BIFF fixture (K1=MISSING_BLANK_LINE_BEFORE_COMMENT

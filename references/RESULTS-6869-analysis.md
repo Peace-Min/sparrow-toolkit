@@ -16,18 +16,18 @@ Run-SparrowSyntaxFix + SparrowCommentFix 적용 후) · **대조 도구**: Sparr
 | PRACTICE.OBJECT_INSTANTIATION | 1078 | 515 | −563 | ⚠️ 부분 |
 | BETWEEN_MEMBER_DEFINITION.MISSING_BLANK_LINE | 616 | 577 | −39 | ❌ 미커버 |
 | OBJECT_INITIALIZATION.NOT_USED_INITIALIZER | 64 | 27 | −37 | ✅ |
-| OVERLY_BROAD_CATCH | 139 | 114 | −25 | (Track C) |
+| OVERLY_BROAD_CATCH | 139 | 114 | −25 | (XLS 분리) |
 | COMMENT.MISSING_PERIOD | 855 | 1753 | **+898** | ❌ (아래 주의) |
 | COMMENT.MISSING_SPACE_AFTER_DELIMITER | 457 | 1045 | +588 | ❌ |
 | COMMENT.LOWERCASE_FIRST_LETTER | 562 | 1149 | +587 | ❌ 미커버 |
 
 ## 핵심 결론
 
-### 1. Track A(var/괄호) = 대성공
+### 1. 코드 규칙(var/괄호) = 대성공
 - **괄호(MISSING_PARENTHESIS) 741 → 0, 100% 소거.** SparrowSyntaxFix `parens`가 완전히 동작.
 - var 계열(OBVIOUS/LOOP/OBJECT_INSTANTIATION) 합계 ~3300 소거. nullcast + SparrowSyntaxFix 유효.
 
-### 2. Track A 잔존(OBJECT_INSTANTIATION 515)의 정체 — 2종
+### 2. [코드 규칙] 잔존(OBJECT_INSTANTIATION 515)의 정체 — 2종
 소스 샘플(6869)로 확인:
 - **(a) 정당한 판단 케이스(변환하면 안 됨, 올바르게 스킵)**:
   - `IDictionary<string,object> expando = new ExpandoObject();` — 선언타입≠생성타입 → var면 타입 변함.
@@ -39,7 +39,7 @@ Run-SparrowSyntaxFix + SparrowCommentFix 적용 후) · **대조 도구**: Sparr
 - → **처방: var 변환을 SparrowSyntaxFix에서 SparrowSyntaxFix(Roslyn)로 이관**하면 (b)를 잡고 (a)는 규칙으로 스킵.
   선언타입==생성타입일 때만 var(=`new` 타입과 동일), 인터페이스/기반타입/튜플명 상이는 스킵.
 
-### 3. Track B(주석) = 동일 경로 기준 소거 0 (측정 위생 주의)
+### 3. 주석·레이아웃 = 동일 경로 기준 소거 0 (측정 위생 주의)
 - **파일명 매칭 착시**: 파일명만으로 매칭하면 다중프로젝트 동명파일(AssemblyInfo.cs 등)이 뭉쳐 "주석 2배 폭증"처럼 보임 → **오판**.
 - **전체 경로 매칭(정확)**: 동일 경로 공통파일 425개의 MISSING_PERIOD = **846 → 846 (변화 0, 증가 파일 0)**.
   즉 **악화된 게 아니라, 하나도 못 지웠다.**
@@ -52,7 +52,7 @@ Run-SparrowSyntaxFix + SparrowCommentFix 적용 후) · **대조 도구**: Sparr
 - LOWERCASE_FIRST_LETTER(1149) — 한글/기호 시작이라 ASCII 대문자화 결정론 불가 → 제거된 상태.
 - BETWEEN_MEMBER_DEFINITION.MISSING_BLANK_LINE(577), USE_ONE_STATEMENT_PER_LINE(65),
   CONTINUATION_LINE.BAD_INDENTATION(57), BLOCK_OF_ASTERISK(45) — Rule 원문 확보됨, 결정론 구현 가능하나 미구현.
-- OVERLY_BROAD_CATCH / EMPTY_CATCH / FORWARD_NULL / RESOURCE_LEAK 등 ~350 — Track C(사람/LLM 판단).
+- OVERLY_BROAD_CATCH / EMPTY_CATCH / FORWARD_NULL / RESOURCE_LEAK 등 ~350 — XLS 분리로 넘김(사람/LLM 판단).
 
 ## 다음 세션 작업(우선순위)
 

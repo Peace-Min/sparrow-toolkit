@@ -52,7 +52,7 @@ try {
     if ($fxExit -ne 0) { Write-Host $fxOut }
     Check "C# fixture harness exits 0 (all before->after cases pass)" { $fxExit -eq 0 }
 
-    # 2) real on-disk project/file: UTF-8 BOM + CRLF; all Track-A Roslyn rules apply to real 6869-style patterns.
+    # 2) real on-disk project/file: UTF-8 BOM + CRLF; all [코드 규칙] Roslyn rules apply to real 6869-style patterns.
     $srcDir = Join-Path $work "src"
     New-Item -ItemType Directory -Force -Path $srcDir | Out-Null
     $nl = "`r`n"

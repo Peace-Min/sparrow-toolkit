@@ -1,9 +1,9 @@
-// TrackCRunReport: machine-readable evidence of ONE Track C run (xls -> per-checker md), plus a short human
+// XlsSplitRunReport: machine-readable evidence of ONE [XLS 분리] run (xls -> per-checker md), plus a short human
 // summary. Its whole reason to exist is post-hoc judgement: "이 실행이 왜 이런 결과를 냈나?" — which xls (by
 // sha256, so a later re-run can prove it is the same input), which scope filter, how many rows/checkers, which
 // checker got which rule attached, and every warning the run produced.
 //
-// HARD CONTRACT — the report NEVER lands in the export output folder. Track C's output contract is "체커 폴더 +
+// HARD CONTRACT — the report NEVER lands in the export output folder. [XLS 분리]'s output contract is "체커 폴더 +
 // 항목 md만, 부산물 0", so the caller passes an explicit path OUTSIDE the output tree (the GUI uses its log
 // folder; the CLI uses --report <PATH>). Without that explicit path NOTHING is written, so a plain run stays
 // byte-identical to before.
@@ -27,7 +27,7 @@ using System.Text.Json;
 namespace SparrowXlsExport.Core
 {
     /// <summary>The run's effective options (what actually shaped the result), as serialized under "options".</summary>
-    public sealed class TrackCReportOptions
+    public sealed class XlsSplitReportOptions
     {
         /// <summary>True when a files-from scope filter was in effect (team split by file).</summary>
         public bool FilesFromUsed { get; set; }
@@ -38,7 +38,7 @@ namespace SparrowXlsExport.Core
         /// <summary>Source root the manifest entries / xls 경로 were resolved against; null when unused.</summary>
         public string? Root { get; set; }
 
-        /// <summary>Exact-match 위험도 filter; empty = no severity filter (Track C default = 전건).</summary>
+        /// <summary>Exact-match 위험도 filter; empty = no severity filter ([XLS 분리] default = 전건).</summary>
         public IReadOnlyList<string> Severities { get; set; } = Array.Empty<string>();
 
         /// <summary>체커 키 substring filter; null = none.</summary>
@@ -52,14 +52,14 @@ namespace SparrowXlsExport.Core
     }
 
     /// <summary>One "체커 키 -> 기록된 항목 수" pair.</summary>
-    public sealed class TrackCReportCheckerCount
+    public sealed class XlsSplitReportCheckerCount
     {
         public string Key { get; set; } = "";
         public int Count { get; set; }
     }
 
     /// <summary>What the rule-attachment layer did for one checker (see <see cref="CheckerMapDetail"/>).</summary>
-    public sealed class TrackCReportAssignment
+    public sealed class XlsSplitReportAssignment
     {
         public string CheckerKey { get; set; } = "";
         public string? RuleName { get; set; }
@@ -69,7 +69,7 @@ namespace SparrowXlsExport.Core
     }
 
     /// <summary>Scope-filter outcome: the cross-PC "wrong checkout" tell-tale and the ambiguous-match note.</summary>
-    public sealed class TrackCReportScope
+    public sealed class XlsSplitReportScope
     {
         public bool Mismatch { get; set; }
         public string? Diagnostic { get; set; }
@@ -77,7 +77,7 @@ namespace SparrowXlsExport.Core
     }
 
     /// <summary>Full report payload. Serialized camelCase, so <c>InputXls</c> becomes <c>"inputXls"</c>.</summary>
-    public sealed class TrackCRunReport
+    public sealed class XlsSplitRunReport
     {
         public string InputXls { get; set; } = "";
         public long InputSizeBytes { get; set; }
@@ -88,7 +88,7 @@ namespace SparrowXlsExport.Core
         public long ElapsedMs { get; set; }
         public string ToolVersion { get; set; } = "";
 
-        public TrackCReportOptions Options { get; set; } = new TrackCReportOptions();
+        public XlsSplitReportOptions Options { get; set; } = new XlsSplitReportOptions();
 
         /// <summary>Sheet the rows came from (sheet pick is part of "why these rows").</summary>
         public string Sheet { get; set; } = "";
@@ -101,17 +101,17 @@ namespace SparrowXlsExport.Core
         public int WrittenMd { get; set; }
         public int CheckerFolders { get; set; }
 
-        public IReadOnlyList<TrackCReportCheckerCount> CheckerCounts { get; set; } = Array.Empty<TrackCReportCheckerCount>();
-        public IReadOnlyList<TrackCReportAssignment> Assignments { get; set; } = Array.Empty<TrackCReportAssignment>();
+        public IReadOnlyList<XlsSplitReportCheckerCount> CheckerCounts { get; set; } = Array.Empty<XlsSplitReportCheckerCount>();
+        public IReadOnlyList<XlsSplitReportAssignment> Assignments { get; set; } = Array.Empty<XlsSplitReportAssignment>();
         public IReadOnlyList<string> UnmappedCheckers { get; set; } = Array.Empty<string>();
 
-        public TrackCReportScope Scope { get; set; } = new TrackCReportScope();
+        public XlsSplitReportScope Scope { get; set; } = new XlsSplitReportScope();
 
         public IReadOnlyList<string> Warnings { get; set; } = Array.Empty<string>();
     }
 
-    /// <summary>Builds and writes the Track C run report. Never throws; a failed write returns false.</summary>
-    public static class TrackCReportWriter
+    /// <summary>Builds and writes the [XLS 분리] run report. Never throws; a failed write returns false.</summary>
+    public static class XlsSplitReportWriter
     {
         private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions
         {
@@ -125,7 +125,7 @@ namespace SparrowXlsExport.Core
         /// layer did not run (no guides), which is recorded as "every checker unmapped" + a warning rather than
         /// silently empty. Pure/allocation-only: touches the filesystem ONLY to size+hash the input xls.
         /// </summary>
-        public static TrackCRunReport Build(ExportOptions opts, ExportResult result, MapResult? map,
+        public static XlsSplitRunReport Build(ExportOptions opts, ExportResult result, MapResult? map,
                                             string? guidesDir, DateTime startedUtc, long elapsedMs)
         {
             var warnings = new List<string>();
@@ -151,7 +151,7 @@ namespace SparrowXlsExport.Core
             }
 
             bool filesFromUsed = !string.IsNullOrWhiteSpace(opts.FilesFrom);
-            var reportOpts = new TrackCReportOptions
+            var reportOpts = new XlsSplitReportOptions
             {
                 FilesFromUsed = filesFromUsed,
                 FilesFrom = filesFromUsed ? opts.FilesFrom : null,
@@ -163,13 +163,13 @@ namespace SparrowXlsExport.Core
                 Max = opts.Max,
             };
 
-            var assignments = new List<TrackCReportAssignment>();
+            var assignments = new List<XlsSplitReportAssignment>();
             var unmapped = new List<string>();
             if (map != null)
             {
                 foreach (CheckerMapDetail d in map.Details)
                 {
-                    assignments.Add(new TrackCReportAssignment
+                    assignments.Add(new XlsSplitReportAssignment
                     {
                         CheckerKey = d.CheckerKey,
                         RuleName = d.RuleName,
@@ -214,7 +214,7 @@ namespace SparrowXlsExport.Core
             if (result.ScopeDiagnostic != null) warnings.Add("[범위 불일치] 선택 소스와 xls 검출 경로가 하나도 일치하지 않습니다.");
             if (result.ScopeAmbiguousWarning != null) warnings.Add(result.ScopeAmbiguousWarning);
 
-            return new TrackCRunReport
+            return new XlsSplitRunReport
             {
                 InputXls = result.InputPath.Length > 0 ? result.InputPath : opts.InputPath,
                 InputSizeBytes = size,
@@ -232,10 +232,10 @@ namespace SparrowXlsExport.Core
                 WrittenMd = result.WrittenCount,
                 CheckerFolders = result.UniqueCheckers,
                 CheckerCounts = result.CheckerCounts
-                    .Select(c => new TrackCReportCheckerCount { Key = c.Key, Count = c.Count }).ToList(),
+                    .Select(c => new XlsSplitReportCheckerCount { Key = c.Key, Count = c.Count }).ToList(),
                 Assignments = assignments,
                 UnmappedCheckers = unmapped,
-                Scope = new TrackCReportScope
+                Scope = new XlsSplitReportScope
                 {
                     Mismatch = result.ScopeMismatch,
                     Diagnostic = result.ScopeDiagnostic,
@@ -251,13 +251,13 @@ namespace SparrowXlsExport.Core
         /// set) instead of throwing, so a read-only/locked log folder can never fail an export.
         /// <para>
         /// ENFORCES the hard contract stated at the top of this file: a report path that lands INSIDE the export
-        /// output tree (<see cref="TrackCRunReport.OutDir"/>, or any subdirectory of it) is REJECTED before anything
+        /// output tree (<see cref="XlsSplitRunReport.OutDir"/>, or any subdirectory of it) is REJECTED before anything
         /// is created — the caller only had a comment promising this before, so <c>--out X --report X\r.json</c>
         /// (or a GUI <c>--log-dir</c> pointed at the output folder) silently broke "체커 폴더 + 항목 md만, 부산물 0".
         /// Rejection is a normal false/error return, so a rejected report never fails the export.
         /// </para>
         /// </summary>
-        public static bool TryWrite(string reportPath, TrackCRunReport report, out string? error)
+        public static bool TryWrite(string reportPath, XlsSplitRunReport report, out string? error)
         {
             error = null;
             if (string.IsNullOrWhiteSpace(reportPath)) { error = "report path is empty"; return false; }
@@ -270,7 +270,7 @@ namespace SparrowXlsExport.Core
                 // create a folder inside (or as) the output tree.
                 if (IsInsideOutputTree(full, report.OutDir, out string? outFull))
                 {
-                    error = "리포트 경로가 Track C 출력 폴더 안입니다 — 출력 계약(체커 폴더 + 항목 md만, 부산물 0)을 "
+                    error = "리포트 경로가 [XLS 분리] 출력 폴더 안입니다 — 출력 계약(체커 폴더 + 항목 md만, 부산물 0)을 "
                             + "깨므로 기록하지 않았습니다. 출력 폴더 밖 경로를 지정하세요. "
                             + "report=" + full + " / out=" + outFull;
                     return false;
@@ -332,10 +332,10 @@ namespace SparrowXlsExport.Core
         }
 
         /// <summary>The short "read this first" transcript: the same facts as the json, in run order.</summary>
-        public static string BuildHumanSummary(TrackCRunReport r)
+        public static string BuildHumanSummary(XlsSplitRunReport r)
         {
             var sb = new StringBuilder();
-            sb.Append("Track C 실행 리포트\n");
+            sb.Append("[XLS 분리] 실행 리포트\n");
             sb.Append("시작(UTC)   : ").Append(r.StartedUtc).Append('\n');
             sb.Append("소요(ms)    : ").Append(r.ElapsedMs.ToString(CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("도구 버전   : ").Append(r.ToolVersion).Append('\n');
@@ -359,7 +359,7 @@ namespace SparrowXlsExport.Core
               .Append(" · 체커 폴더 ").Append(r.CheckerFolders.ToString(CultureInfo.InvariantCulture)).Append('\n');
 
             sb.Append("\n[체커별 건수]\n");
-            foreach (TrackCReportCheckerCount c in r.CheckerCounts)
+            foreach (XlsSplitReportCheckerCount c in r.CheckerCounts)
             {
                 sb.Append("  ").Append(c.Key.Length > 0 ? c.Key : "(체커 키 없음)")
                   .Append(" : ").Append(c.Count.ToString(CultureInfo.InvariantCulture)).Append('\n');
@@ -367,7 +367,7 @@ namespace SparrowXlsExport.Core
             if (r.CheckerCounts.Count == 0) sb.Append("  (없음)\n");
 
             sb.Append("\n[규칙 지정/부착]\n");
-            foreach (TrackCReportAssignment a in r.Assignments)
+            foreach (XlsSplitReportAssignment a in r.Assignments)
             {
                 sb.Append("  ").Append(a.CheckerKey).Append(" -> ").Append(a.RuleName ?? "(미지정)")
                   .Append(" · 규칙파일 ").Append(a.RuleExists ? "있음" : "없음")
@@ -399,13 +399,13 @@ namespace SparrowXlsExport.Core
             return sb.ToString();
         }
 
-        // Version of the Core assembly (all Track C paths — CLI and GUI — share it), so a report can be tied back
+        // Version of the Core assembly (all [XLS 분리] paths — CLI and GUI — share it), so a report can be tied back
         // to the build that produced it. Informational version first (it carries any +sha suffix).
         private static string ResolveToolVersion()
         {
             try
             {
-                Assembly asm = typeof(TrackCReportWriter).Assembly;
+                Assembly asm = typeof(XlsSplitReportWriter).Assembly;
                 string? info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
                 string name = asm.GetName().Name ?? "SparrowXlsExport.Core";
                 string ver = !string.IsNullOrWhiteSpace(info) ? info! : (asm.GetName().Version?.ToString() ?? "0.0.0.0");

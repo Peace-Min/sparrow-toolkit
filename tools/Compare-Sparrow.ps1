@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    Compare-Sparrow.ps1 — Track C G2 게이트 툴 (count-based, full-path-aware, line-insensitive).
+    Compare-Sparrow.ps1 — [XLS 분리] G2 게이트 툴 (count-based, full-path-aware, line-insensitive).
 
     수정 전/후 Sparrow .xls 두 개를 SparrowXlsExport.exe로 파싱해 산출 md(체커별 폴더)를 비교한다.
     (익스포터는 index.csv를 만들지 않는다 — 항목 md의 필드표에서 체커 키/파일명/경로를 읽는다.)

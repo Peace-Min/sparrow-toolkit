@@ -1,7 +1,7 @@
 ﻿// SparrowCommentFix: deterministic CLI that fixes COMMENT-TRIVIA-ONLY style issues flagged by the Sparrow
 // (파수) static analyzer, WITHOUT loading any project. It operates on .cs TEXT files directly, so legacy
 // non-SDK .csproj / .NET Framework 4.7.2 targets are irrelevant. Purpose: take the deterministic comment
-// clean-ups out of a weak local LLM's hands in an air-gapped environment (Track B of the pipeline).
+// clean-ups out of a weak local LLM's hands in an air-gapped environment ([주석·레이아웃] of the pipeline).
 //
 // SCOPE = ACTIVE COMMENT + LAYOUT RULES (validated against the REAL Sparrow output,
 // issues_sample_6827.xls / 6855.xls, plus the checker descriptions):

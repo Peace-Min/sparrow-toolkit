@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 <#
-    Run-SparrowSyntaxFix.ps1 — Track A 2단계 원콜 러너.
-    Track A 체커를 자작 Roslyn 툴 SparrowSyntaxFix로 결정론 처리:
+    Run-SparrowSyntaxFix.ps1 — [코드 규칙] 2단계 원콜 러너.
+    [코드 규칙] 체커를 자작 Roslyn 툴 SparrowSyntaxFix로 결정론 처리:
       - nullvar              : `<타입> x = null;` / `<타입> x;` -> `var x = (<타입>)null;`(커밋명 review-needed)
       - parens               : `a && b` 등의 비교/산술 피연산자 괄호
       - objectvar-safe       : `Foo x = new Foo()` -> `var x = new Foo()`
@@ -94,7 +94,7 @@ if (-not $Solution) { throw "경로가 비었습니다. 솔루션(.sln) 또는 �
 
 # 규칙 -> 커밋 라벨 (검수 가능한 단위로 규칙별 커밋)
 #
-# 라벨이 '검토필요:' 로 시작하면 커밋 접두가 'sparrow(A)! ' 가 된다(아래 커밋 단계). 그래서 이 표의
+# 라벨이 '검토필요:' 로 시작하면 커밋 접두가 'sparrow(rule)! ' 가 된다(아래 커밋 단계). 그래서 이 표의
 # '검토필요:' 유무 = SparrowSyntaxFix\README.md 규칙 표의 review-needed 여부와 반드시 일치해야 한다.
 # (어긋나면 "검토필요 커밋만 revert" 작업에서 위험 규칙 커밋이 통째로 누락된다 — 실제로 forvar/fieldsplit/
 #  emptystmt 가 그렇게 빠져 있었다.) 키는 canonical 규칙명만 쓴다: nullcast 는 nullvar 로 정규화되어
@@ -505,7 +505,7 @@ foreach ($r in $Rules) {
             }
             Write-Host "  게이트    : 통과(exit 0) -> 커밋 진행"
         }
-        $prefix = if ($labels[$r] -like '검토필요:*') { 'sparrow(A)! ' } else { 'sparrow(A): ' }
+        $prefix = if ($labels[$r] -like '검토필요:*') { 'sparrow(rule)! ' } else { 'sparrow(rule): ' }
         $res = Invoke-GitCommitStep -Root $root -Message "$prefix$($labels[$r])" -PathspecFile $gitPathspecFile
         switch ($res) {
             'committed' { Write-Host "  커밋      : $prefix$($labels[$r])" }

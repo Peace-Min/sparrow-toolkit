@@ -19,7 +19,7 @@ using SparrowXlsExport.Core;
 namespace SparrowRunner.Gui
 {
     /// <summary>
-    /// WPF wrapper for Track A/B PowerShell runners. Rewrite logic stays in the existing CLI scripts.
+    /// WPF wrapper for [코드 규칙]·[주석·레이아웃] PowerShell runners. Rewrite logic stays in the existing CLI scripts.
     /// </summary>
     public partial class MainWindow : Window
     {
@@ -32,7 +32,7 @@ namespace SparrowRunner.Gui
         private readonly string _guidesDir;
 
         // 세션 파일 로그(화면 LogBox 는 앱을 닫으면 증발한다). AppendLog 가 화면 + 이 파일에 동시 기록하고,
-        // Track C 실행 리포트도 같은 로그 폴더에 남는다(출력 폴더 순수성 유지). 기록 실패는 앱을 죽이지 않는다.
+        // [XLS 분리] 실행 리포트도 같은 로그 폴더에 남는다(출력 폴더 순수성 유지). 기록 실패는 앱을 죽이지 않는다.
         private readonly SessionLog _sessionLog;
 
         // 창 스냅샷(--screenshot-dir). 이 앱은 미설치 커스텀 exe라 외부에서 스크린샷을 찍을 수 없어, UI 증거가
@@ -40,17 +40,17 @@ namespace SparrowRunner.Gui
         // 인자를 주지 않으면 null = 기능 전체 비활성(기존 동작 완전 불변).
         private readonly SnapshotRecorder? _snapshots;
 
-        // 테스트 기동 인자(GUI를 알려진 상태로 자동 구동): Track C 탭 프리필 + 선택적 자동실행 + 관리창 자동 오픈.
-        private readonly string? _startupTrackCXls;
-        private readonly string? _startupTrackCOut;
-        private readonly bool _startupTrackCAutorun;
+        // 테스트 기동 인자(GUI를 알려진 상태로 자동 구동): [XLS 분리] 탭 프리필 + 선택적 자동실행 + 관리창 자동 오픈.
+        private readonly string? _startupXls;
+        private readonly string? _startupXlsOut;
+        private readonly bool _startupXlsAutorun;
         private readonly bool _startupOpenRuleManager;
 
-        // 활성 대분류(+ A/B 화면의 하위 탭)가 곧 실행 트랙이다. 트랙은 내부 개념이고 화면에는 노출하지 않는다.
-        //   [코드 자동수정] 대분류 → 선택된 하위 탭([코드 규칙]=Track A / [주석·레이아웃]=Track B)
-        //   [XLS 분리]     대분류 → 항상 Track C
+        // 활성 대분류(+ [코드 자동수정] 화면의 하위 탭)가 곧 실행 기능이다.
+        //   [코드 자동수정] 대분류 → 선택된 하위 탭([코드 규칙] / [주석·레이아웃])
+        //   [XLS 분리]     대분류 → 항상 [XLS 분리]
         //   None = 방어용 폴백(로드 전 등 어느 하위 탭도 선택되지 않은 순간).
-        private enum ActiveTrack { A, B, C, None }
+        private enum ActiveMode { CodeRule, Comment, XlsSplit, None }
 
         // GUI 실행 모드는 [규칙별 커밋 생성](CommitCheck) 체크 상태가 결정한다:
         //   꺼짐(기본) → 러너에 -NoCommit  : 파일만 수정, 커밋은 사용자가 git 으로 한다(git diff 로 검토).
@@ -74,24 +74,24 @@ namespace SparrowRunner.Gui
             ? "커밋: 규칙별로 커밋함 (러너에 -Commit — 규칙 하나 = 커밋 하나, git log 로 확인)"
             : "커밋: 하지 않음 (러너에 -NoCommit — 검토 후 git 으로 직접 커밋하세요)";
 
-        // review-needed 규칙 목록(Track A). 단일 진실은 엔진 README
+        // review-needed 규칙 목록([코드 규칙]). 단일 진실은 엔진 README
         // (tools\_internal\SparrowSyntaxFix\README.md) 규칙 표의 'Commit policy' 열이고,
-        // 러너 Run-SparrowSyntaxFix.ps1 의 $labels '검토필요:' 접두(→ 커밋 접두 'sparrow(A)! ')와
+        // 러너 Run-SparrowSyntaxFix.ps1 의 $labels '검토필요:' 접두(→ 커밋 접두 'sparrow(rule)! ')와
         // 아래 목록·XAML 의 '[검토필요] ' 라벨이 전부 그 표를 따라간다. 셋이 어긋나면 "검토필요 커밋만
         // revert" 작업에서 위험 규칙이 통째로 누락된다(실제로 forvar/fieldsplit/emptystmt/objectinitializer 가 그랬다).
-        private CheckBox[] ReviewNeededTrackARules => new[]
+        private CheckBox[] ReviewNeededCodeRules => new[]
         {
             ASForeachCast, ASObjectInitializer, ASNullVar, ASObjectVarNarrowing, ASLocalConst,
             ASArrayVarNarrowing, ASForVar, ASFieldSplit, ASEmptyStmt, ASForHoist,
         };
 
-        /// <summary>review-needed 규칙 목록(Track B). 러너 Run-SparrowCommentFix.ps1 의 $labels 와 일치한다.</summary>
-        private CheckBox[] ReviewNeededTrackBRules => new[] { BBlockPromote };
+        /// <summary>review-needed 규칙 목록([주석·레이아웃]). 러너 Run-SparrowCommentFix.ps1 의 $labels 와 일치한다.</summary>
+        private CheckBox[] ReviewNeededCommentRules => new[] { BBlockPromote };
 
         private void CommitCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (!IsLoaded) return;
-            UpdateRunButtonForTrack();
+            UpdateRunButtonForMode();
             UpdateSummary();
         }
 
@@ -104,7 +104,7 @@ namespace SparrowRunner.Gui
         private CancellationTokenSource? _scopeCts;
         private CancellationTokenSource? _xlsScopeCts;
         private Process? _currentProcess;
-        private string? _lastTrackCOutputDir;
+        private string? _lastXlsOutputDir;
         private SourceScope? _currentScope;
 
         // XLS 분리 대분류의 범위 트리(로컬 소스 스캔이 아니라 xls 검출 경로로 만든다).
@@ -119,9 +119,9 @@ namespace SparrowRunner.Gui
         /// <summary>XLS 분리 대분류의 범위 트리 루트(리프의 FullPath = xls 원본 경로 문자열).</summary>
         public ObservableCollection<SourceScopeNode> XlsScopeRoots { get; } = new ObservableCollection<SourceScopeNode>();
 
-        // Track C 검출 체커(키·건수). xls 로드 시(census) 또는 실행 후(출력 트리)에 채워진다. [체커 규칙 관리]
+        // [XLS 분리] 검출 체커(키·건수). xls 로드 시(census) 또는 실행 후(출력 트리)에 채워진다. [체커 규칙 관리]
         // 창으로 전달하고, 메인 요약 "검출 체커 N종 · 매핑 M · 미매핑 K"(지정 기준) 계산에 쓴다.
-        private List<(string Key, int Count)> _trackCCheckers = new List<(string Key, int Count)>();
+        private List<(string Key, int Count)> _xlsCheckers = new List<(string Key, int Count)>();
 
         // 열려 있는 규칙 관리 창(모덜리스). 중복 오픈 방지 + 닫힐 때 메인 요약을 지정 기준으로 다시 계산한다.
         private RuleManagerWindow? _ruleManager;
@@ -136,9 +136,9 @@ namespace SparrowRunner.Gui
             _guidesDir = !string.IsNullOrWhiteSpace(startup.GuidesDir)
                 ? Path.GetFullPath(startup.GuidesDir!.Trim().Trim('"'))
                 : Path.Combine(_skillRoot, "references", "checkers");
-            _startupTrackCXls = startup.TrackCXls;
-            _startupTrackCOut = startup.TrackCOut;
-            _startupTrackCAutorun = startup.TrackCAutorun;
+            _startupXls = startup.Xls;
+            _startupXlsOut = startup.XlsOut;
+            _startupXlsAutorun = startup.XlsAutorun;
             _startupOpenRuleManager = startup.OpenRuleManager;
 
             // 파일 로그를 첫 AppendLog 전에 연다(준비 로그부터 파일에 남게).
@@ -158,14 +158,14 @@ namespace SparrowRunner.Gui
             ShowRuleInfo(nameof(ASObjectVarSafe));
             Loaded += async (_, _) =>
             {
-                UpdateRunButtonForTrack();
+                UpdateRunButtonForMode();
                 UpdateSummary();
-                ApplyStartupTrackCPrefill();
+                ApplyStartupXlsPrefill();
                 // 관리창을 열기 전에 검출 체커를 확실히 로드한다(census). --open-rule-manager 경로가 빈 목록으로
                 // 열리지 않도록 프리필된 xls 를 여기서 await 한다. 범위 트리도 같은 xls 로 함께 만든다.
-                if (!string.IsNullOrWhiteSpace(TrackCXlsPathBox.Text))
+                if (!string.IsNullOrWhiteSpace(XlsPathBox.Text))
                 {
-                    await RefreshTrackCSummaryFromXlsAsync();
+                    await RefreshCheckerSummaryFromXlsAsync();
                     await RefreshXlsScopeAsync();
                 }
                 await RefreshScopeAsync(showErrors: false);
@@ -177,57 +177,57 @@ namespace SparrowRunner.Gui
                     _snapshots.Capture(this, "main-loaded");
                 }
                 if (_startupOpenRuleManager) OpenRuleManager();
-                if (_startupTrackCAutorun) await AutoRunTrackCAsync();
+                if (_startupXlsAutorun) await AutoRunXlsSplitAsync();
             };
         }
 
-        // Track C 기동 인자를 UI에 반영한다: xls/출력 프리필이 있으면 [XLS 분리] 대분류를 선택하고 경로 상자를 채운다.
+        // [XLS 분리] 기동 인자를 UI에 반영한다: xls/출력 프리필이 있으면 [XLS 분리] 대분류를 선택하고 경로 상자를 채운다.
         // (autorun만 준 경우에도 XLS 분리 화면으로 전환한다.)
-        private void ApplyStartupTrackCPrefill()
+        private void ApplyStartupXlsPrefill()
         {
             bool any = false;
-            if (!string.IsNullOrWhiteSpace(_startupTrackCXls))
+            if (!string.IsNullOrWhiteSpace(_startupXls))
             {
-                TrackCXlsPathBox.Text = _startupTrackCXls!.Trim().Trim('"');
+                XlsPathBox.Text = _startupXls!.Trim().Trim('"');
                 any = true;
             }
-            if (!string.IsNullOrWhiteSpace(_startupTrackCOut))
+            if (!string.IsNullOrWhiteSpace(_startupXlsOut))
             {
-                TrackCOutputPathBox.Text = _startupTrackCOut!.Trim().Trim('"');
+                XlsOutputPathBox.Text = _startupXlsOut!.Trim().Trim('"');
                 any = true;
             }
-            if (any || _startupTrackCAutorun)
+            if (any || _startupXlsAutorun)
             {
                 SectionTabs.SelectedItem = SectionXlsTab;   // SelectionChanged가 버튼/요약/안내를 갱신
             }
         }
 
-        // autorun: 실제 소스 트리 없이 xls만으로 Track C 를 구동한다(테스트 하네스 경로). 스코프 필터(FilesFrom)는
+        // autorun: 실제 소스 트리 없이 xls만으로 [XLS 분리] 를 구동한다(테스트 하네스 경로). 스코프 필터(FilesFrom)는
         // 비워 전건을 익스포트한다. 그 외에는 RunButton 의 인프로세스 경로(SparrowExporter.Run + CheckerRuleMapper.Apply)를
         // 그대로 재사용한다.
-        private async Task AutoRunTrackCAsync()
+        private async Task AutoRunXlsSplitAsync()
         {
-            string trackCXls = TrackCXlsPathBox.Text.Trim().Trim('"');
-            if (string.IsNullOrEmpty(trackCXls) || !File.Exists(trackCXls))
+            string xlsPath = XlsPathBox.Text.Trim().Trim('"');
+            if (string.IsNullOrEmpty(xlsPath) || !File.Exists(xlsPath))
             {
-                AppendLog("autorun 취소: Track C XLS 를 찾을 수 없습니다 (" + trackCXls + ")");
+                AppendLog("autorun 취소: [XLS 분리] XLS 를 찾을 수 없습니다 (" + xlsPath + ")");
                 return;
             }
             if (_cts != null) return;   // 이미 실행 중
 
             _cts = new CancellationTokenSource();
             SetRunning(true);
-            _lastTrackCOutputDir = null;
-            OpenTrackCOutputButton.IsEnabled = false;
+            _lastXlsOutputDir = null;
+            OpenXlsOutputButton.IsEnabled = false;
             AppendLog("");
-            AppendLog(">>> autorun: Track C (스코프 필터 없음 · 전건)");
-            AppendLog("track-c xls: " + trackCXls);
+            AppendLog(">>> autorun: [XLS 분리] (스코프 필터 없음 · 전건)");
+            AppendLog("xls: " + xlsPath);
             AppendLog(new string('-', 72));
             try
             {
-                _lastTrackCOutputDir = await RunTrackCAsync(trackCXls, sourceRoot: "", filesFrom: "", _cts.Token);
-                OpenTrackCOutputButton.IsEnabled = Directory.Exists(_lastTrackCOutputDir);
-                await RefreshTrackCSummaryFromOutputAsync(_lastTrackCOutputDir);
+                _lastXlsOutputDir = await RunXlsSplitAsync(xlsPath, sourceRoot: "", filesFrom: "", _cts.Token);
+                OpenXlsOutputButton.IsEnabled = Directory.Exists(_lastXlsOutputDir);
+                await RefreshCheckerSummaryFromOutputAsync(_lastXlsOutputDir);
                 StatusText.Text = "완료";
                 SummaryModeText.Text = "autorun 완료. 지정된 규칙만 부착됩니다.";
                 AppendLog(new string('-', 72));
@@ -251,54 +251,54 @@ namespace SparrowRunner.Gui
                 _cts = null;
                 SetRunning(false);
                 UpdateSummary();
-                // 자동 지점 3(autorun 경로): Track C 실행 완료 후(메인 창).
+                // 자동 지점 3(autorun 경로): [XLS 분리] 실행 완료 후(메인 창).
                 _snapshots?.CaptureWhenIdle(this, "after-run");
             }
         }
 
-        // XLS 분리 대분류가 선택되어 있나(= Track C 화면).
+        // XLS 분리 대분류가 선택되어 있나(= [XLS 분리] 화면).
         private bool IsXlsSection() => ReferenceEquals(SectionTabs.SelectedItem, SectionXlsTab);
 
-        private ActiveTrack CurrentTrack()
+        private ActiveMode CurrentMode()
         {
-            if (IsXlsSection()) return ActiveTrack.C;   // XLS 분리 화면은 항상 Track C
+            if (IsXlsSection()) return ActiveMode.XlsSplit;   // XLS 분리 화면은 항상 [XLS 분리]
             object? selected = RulesTabs.SelectedItem;
-            if (ReferenceEquals(selected, TrackATab)) return ActiveTrack.A;
-            if (ReferenceEquals(selected, TrackBTab)) return ActiveTrack.B;
-            return ActiveTrack.None; // 방어용: 로드 전 등 어느 하위 탭도 선택되지 않은 순간
+            if (ReferenceEquals(selected, CodeRuleTab)) return ActiveMode.CodeRule;
+            if (ReferenceEquals(selected, CommentTab)) return ActiveMode.Comment;
+            return ActiveMode.None; // 방어용: 로드 전 등 어느 하위 탭도 선택되지 않은 순간
         }
 
-        private void UpdateRunButtonForTrack()
+        private void UpdateRunButtonForMode()
         {
-            // 대분류별로 의미 없는 보조 버튼은 아예 감춘다(대상 폴더 = A/B 전용, 출력 폴더 = XLS 분리 전용).
+            // 대분류별로 의미 없는 보조 버튼은 아예 감춘다(대상 폴더 = [코드 자동수정] 전용, 출력 폴더 = XLS 분리 전용).
             // 비활성으로만 두면 "쓸 수 없는 버튼이 계속 보이는" 상태라 대분류를 나눈 취지(관련 없는 UI를
             // 아예 안 보이게)에 어긋난다 — 스냅샷 PNG 로 확인해 Visibility 제어로 바꿨다.
             bool xls = IsXlsSection();
             OpenTargetButton.Visibility = xls ? Visibility.Collapsed : Visibility.Visible;
-            OpenTrackCOutputButton.Visibility = xls ? Visibility.Visible : Visibility.Collapsed;
+            OpenXlsOutputButton.Visibility = xls ? Visibility.Visible : Visibility.Collapsed;
             OpenTargetButton.IsEnabled = !xls && _cts == null;
-            OpenTrackCOutputButton.IsEnabled = xls && _cts == null && Directory.Exists(_lastTrackCOutputDir ?? "");
+            OpenXlsOutputButton.IsEnabled = xls && _cts == null && Directory.Exists(_lastXlsOutputDir ?? "");
 
-            // 규칙별 커밋은 러너(A/B)가 만드는 것이다. [XLS 분리]는 읽기전용이라 커밋이 없으므로 숨긴다 —
+            // 규칙별 커밋은 자동수정 러너가 만드는 것이다. [XLS 분리]는 읽기전용이라 커밋이 없으므로 숨긴다 —
             // 눌러도 아무 의미가 없는 옵션을 남겨 두지 않는다.
-            ActiveTrack track = CurrentTrack();
+            ActiveMode mode = CurrentMode();
             bool commitApplies = !xls;
             CommitCheck.Visibility = commitApplies ? Visibility.Visible : Visibility.Collapsed;
             CommitCheck.IsEnabled = commitApplies && _cts == null;
 
-            switch (track)
+            switch (mode)
             {
-                case ActiveTrack.A:
+                case ActiveMode.CodeRule:
                     RunButton.Content = "코드 규칙 수정 실행";
                     RunButton.ToolTip = ModeNotice;
                     RunButton.IsEnabled = _cts == null;
                     break;
-                case ActiveTrack.B:
+                case ActiveMode.Comment:
                     RunButton.Content = "주석·레이아웃 수정 실행";
                     RunButton.ToolTip = ModeNotice;
                     RunButton.IsEnabled = _cts == null;
                     break;
-                case ActiveTrack.C:
+                case ActiveMode.XlsSplit:
                     RunButton.Content = "XLS 분리 실행";
                     RunButton.ToolTip = null;
                     RunButton.IsEnabled = _cts == null;
@@ -318,13 +318,13 @@ namespace SparrowRunner.Gui
             if (!ReferenceEquals(e.OriginalSource, SectionTabs)) return;
             if (!IsLoaded) return;
 
-            UpdateRunButtonForTrack();
+            UpdateRunButtonForMode();
             if (!IsXlsSection())
             {
                 // [코드 자동수정] 화면으로 돌아오면 하위 탭에 맞는 설명을 다시 띄운다.
-                switch (CurrentTrack())
+                switch (CurrentMode())
                 {
-                    case ActiveTrack.B: ShowRuleInfo(nameof(BTrailing)); break;
+                    case ActiveMode.Comment: ShowRuleInfo(nameof(BTrailing)); break;
                     default: ShowRuleInfo(nameof(ASObjectVarSafe)); break;
                 }
             }
@@ -337,13 +337,13 @@ namespace SparrowRunner.Gui
             // TabControl 초기 선택은 InitializeComponent 도중(다른 명명 요소 생성 전) 발생할 수 있으므로 로드 후에만 처리한다.
             if (!IsLoaded) return;
 
-            UpdateRunButtonForTrack();
-            switch (CurrentTrack())
+            UpdateRunButtonForMode();
+            switch (CurrentMode())
             {
-                case ActiveTrack.A:
+                case ActiveMode.CodeRule:
                     ShowRuleInfo(nameof(ASObjectVarSafe));
                     break;
-                case ActiveTrack.B:
+                case ActiveMode.Comment:
                     ShowRuleInfo(nameof(BTrailing));
                     break;
             }
@@ -378,7 +378,7 @@ namespace SparrowRunner.Gui
             }
         }
 
-        private void BrowseTrackCXlsButton_Click(object sender, RoutedEventArgs e)
+        private void BrowseXlsButton_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
             {
@@ -388,42 +388,42 @@ namespace SparrowRunner.Gui
             };
             if (dlg.ShowDialog(this) == true)
             {
-                TrackCXlsPathBox.Text = dlg.FileName;
+                XlsPathBox.Text = dlg.FileName;
             }
         }
 
-        private void BrowseTrackCOutputButton_Click(object sender, RoutedEventArgs e)
+        private void BrowseXlsOutputButton_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFolderDialog
             {
-                Title = "Track C 출력 폴더 선택"
+                Title = "[XLS 분리] 출력 폴더 선택"
             };
-            string current = TrackCOutputPathBox.Text.Trim();
+            string current = XlsOutputPathBox.Text.Trim();
             if (Directory.Exists(current)) dlg.InitialDirectory = current;
             if (dlg.ShowDialog(this) == true)
             {
-                TrackCOutputPathBox.Text = dlg.FolderName;
+                XlsOutputPathBox.Text = dlg.FolderName;
             }
         }
 
         private async void RunButton_Click(object sender, RoutedEventArgs e)
         {
-            // 활성 탭이 곧 실행 트랙이다. 옵션 탭(None)은 실행 대상이 아니며 버튼도 비활성이지만 방어적으로 가드한다.
-            ActiveTrack track = CurrentTrack();
-            if (track == ActiveTrack.None)
+            // 활성 탭이 곧 실행 기능이다. 옵션 탭(None)은 실행 대상이 아니며 버튼도 비활성이지만 방어적으로 가드한다.
+            ActiveMode mode = CurrentMode();
+            if (mode == ActiveMode.None)
             {
                 return;
             }
 
-            // Track C 는 입력이 xls 하나다. 대상/범위 선택은 선택 사항(팀 분담 필터)이라 별도 경로로 처리한다.
-            if (track == ActiveTrack.C)
+            // [XLS 분리] 는 입력이 xls 하나다. 대상/범위 선택은 선택 사항(팀 분담 필터)이라 별도 경로로 처리한다.
+            if (mode == ActiveMode.XlsSplit)
             {
-                await RunTrackCInteractiveAsync();
+                await RunXlsSplitInteractiveAsync();
                 return;
             }
 
-            bool runTrackA = track == ActiveTrack.A;
-            bool runTrackB = track == ActiveTrack.B;
+            bool runCodeRule = mode == ActiveMode.CodeRule;
+            bool runComment = mode == ActiveMode.Comment;
 
             string target = TargetPathBox.Text.Trim().Trim('"');
             if (string.IsNullOrEmpty(target) || (!File.Exists(target) && !Directory.Exists(target)))
@@ -454,7 +454,7 @@ namespace SparrowRunner.Gui
                 return;
             }
 
-            var jobs = BuildJobs(target, scopeManifest, runTrackA, runTrackB);
+            var jobs = BuildJobs(target, scopeManifest, runCodeRule, runComment);
             if (jobs.Count == 0)
             {
                 TryDeleteFile(scopeManifest);
@@ -469,8 +469,8 @@ namespace SparrowRunner.Gui
 
             _cts = new CancellationTokenSource();
             SetRunning(true);
-            _lastTrackCOutputDir = null;
-            OpenTrackCOutputButton.IsEnabled = false;
+            _lastXlsOutputDir = null;
+            OpenXlsOutputButton.IsEnabled = false;
             AppendLog("");
             AppendLog("target: " + target);
             AppendLog("scope: " + selectedFiles.Count + " selected / " + scope.TotalFiles + " discovered"
@@ -560,14 +560,14 @@ namespace SparrowRunner.Gui
             return changed;
         }
 
-        // Track C(XLS 분리) 실행(사용자 트리거). 입력은 xls 하나이고 프로젝트 경로는 쓰지 않는다. 범위 트리에서
+        // [XLS 분리] 실행(사용자 트리거). 입력은 xls 하나이고 프로젝트 경로는 쓰지 않는다. 범위 트리에서
         // 고른 항목이 있으면 그 xls 원본 경로를 그대로 manifest 로 넘겨(RootPath 없이) 팀 분담 필터로 쓰고, 아무것도
         // 고르지 않으면 전건이다. export + CheckerRuleMapper.Apply(캐시 반영)로 실행 전에 저장해 둔 지정이 자동
         // 부착되고, 이후 요약을 실행 결과(상태·건수)로 최신화한다.
-        private async Task RunTrackCInteractiveAsync()
+        private async Task RunXlsSplitInteractiveAsync()
         {
-            string trackCXls = TrackCXlsPathBox.Text.Trim().Trim('"');
-            if (string.IsNullOrEmpty(trackCXls) || !File.Exists(trackCXls))
+            string xlsPath = XlsPathBox.Text.Trim().Trim('"');
+            if (string.IsNullOrEmpty(xlsPath) || !File.Exists(xlsPath))
             {
                 MessageBox.Show(this, "Sparrow 결과 XLS 파일을 먼저 선택하세요.", "입력 확인",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -601,17 +601,17 @@ namespace SparrowRunner.Gui
 
             _cts = new CancellationTokenSource();
             SetRunning(true);
-            _lastTrackCOutputDir = null;
-            OpenTrackCOutputButton.IsEnabled = false;
+            _lastXlsOutputDir = null;
+            OpenXlsOutputButton.IsEnabled = false;
             AppendLog("");
-            AppendLog(">>> XLS 분리 실행(Track C)" + (filesFrom.Length > 0 ? " (범위 필터 적용)" : " (범위 선택 없음 · 전건)"));
-            AppendLog("입력 xls: " + trackCXls);
+            AppendLog(">>> XLS 분리 실행([XLS 분리])" + (filesFrom.Length > 0 ? " (범위 필터 적용)" : " (범위 선택 없음 · 전건)"));
+            AppendLog("입력 xls: " + xlsPath);
             AppendLog(new string('-', 72));
             try
             {
-                _lastTrackCOutputDir = await RunTrackCAsync(trackCXls, sourceRoot, filesFrom, _cts.Token);
-                OpenTrackCOutputButton.IsEnabled = Directory.Exists(_lastTrackCOutputDir);
-                await RefreshTrackCSummaryFromOutputAsync(_lastTrackCOutputDir);
+                _lastXlsOutputDir = await RunXlsSplitAsync(xlsPath, sourceRoot, filesFrom, _cts.Token);
+                OpenXlsOutputButton.IsEnabled = Directory.Exists(_lastXlsOutputDir);
+                await RefreshCheckerSummaryFromOutputAsync(_lastXlsOutputDir);
                 StatusText.Text = "완료";
                 SummaryModeText.Text = "실행 완료. 지정된 규칙만 부착됩니다.";
                 AppendLog(new string('-', 72));
@@ -638,7 +638,7 @@ namespace SparrowRunner.Gui
                 TryDeleteFile(scopeManifest);
                 SetRunning(false);
                 UpdateSummary();
-                // 자동 지점 3: Track C 실행 완료 후(메인 창) — 실행 결과가 반영된 요약/매핑 패널이 찍힌다.
+                // 자동 지점 3: [XLS 분리] 실행 완료 후(메인 창) — 실행 결과가 반영된 요약/매핑 패널이 찍힌다.
                 _snapshots?.CaptureWhenIdle(this, "after-run");
             }
         }
@@ -676,16 +676,16 @@ namespace SparrowRunner.Gui
             Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
         }
 
-        private void OpenTrackCOutputButton_Click(object sender, RoutedEventArgs e)
+        private void OpenXlsOutputButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_lastTrackCOutputDir) || !Directory.Exists(_lastTrackCOutputDir))
+            if (string.IsNullOrEmpty(_lastXlsOutputDir) || !Directory.Exists(_lastXlsOutputDir))
             {
-                MessageBox.Show(this, "열 수 있는 Track C 출력 폴더가 없습니다.", "안내",
+                MessageBox.Show(this, "열 수 있는 [XLS 분리] 출력 폴더가 없습니다.", "안내",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            Process.Start(new ProcessStartInfo { FileName = _lastTrackCOutputDir, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = _lastXlsOutputDir, UseShellExecute = true });
         }
 
         private void ClearLogButton_Click(object sender, RoutedEventArgs e)
@@ -699,12 +699,12 @@ namespace SparrowRunner.Gui
             _ = RefreshScopeAsync(showErrors: false);
         }
 
-        // XLS 경로가 설정되는 순간(찾아보기 선택 OR 시작 인자 --trackc-xls 프리필) 실행(export) 없이 체커와 검출
+        // XLS 경로가 설정되는 순간(찾아보기 선택 OR 시작 인자 --xls 프리필) 실행(export) 없이 체커와 검출
         // 경로만 파싱해 요약·범위 트리를 즉시 채운다. 경로 상자는 IsReadOnly 라 프로그램적 설정 시에만 발생한다.
-        private void TrackCXlsPathBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void XlsPathBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!IsLoaded) return;
-            _ = RefreshTrackCSummaryFromXlsAsync();
+            _ = RefreshCheckerSummaryFromXlsAsync();
             _ = RefreshXlsScopeAsync();
         }
 
@@ -752,7 +752,7 @@ namespace SparrowRunner.Gui
             _xlsScopeCts = new CancellationTokenSource();
             CancellationToken token = _xlsScopeCts.Token;
 
-            string xls = TrackCXlsPathBox.Text.Trim().Trim('"');
+            string xls = XlsPathBox.Text.Trim().Trim('"');
             if (string.IsNullOrEmpty(xls) || !File.Exists(xls))
             {
                 _currentXlsScope = null;
@@ -914,10 +914,10 @@ namespace SparrowRunner.Gui
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        private List<RunnerJob> BuildJobs(string target, string filesFrom, bool runTrackA, bool runTrackB)
+        private List<RunnerJob> BuildJobs(string target, string filesFrom, bool runCodeRule, bool runComment)
         {
             var jobs = new List<RunnerJob>();
-            if (!runTrackA && !runTrackB)
+            if (!runCodeRule && !runComment)
             {
                 return jobs;
             }
@@ -925,7 +925,7 @@ namespace SparrowRunner.Gui
             string logDir = ResolveTargetRoot(target);
             Directory.CreateDirectory(logDir);
 
-            if (runTrackA)
+            if (runCodeRule)
             {
                 var rules = CollectRules(
                     (ASObjectVarSafe, "objectvar-safe"),
@@ -952,7 +952,7 @@ namespace SparrowRunner.Gui
                 }
             }
 
-            if (runTrackB)
+            if (runComment)
             {
                 var rules = CollectRules(
                     (BTrailing, "trailing"),
@@ -1054,11 +1054,11 @@ namespace SparrowRunner.Gui
             }
         }
 
-        private async Task<string> RunTrackCAsync(string inputXls, string sourceRoot, string filesFrom, CancellationToken cancellationToken)
+        private async Task<string> RunXlsSplitAsync(string inputXls, string sourceRoot, string filesFrom, CancellationToken cancellationToken)
         {
             // 익스포터 산출물(<체커 키>\{ID}_{파일명}_{라인}.md)을 사용자가 지정한 출력 폴더에 그대로 생성한다.
             // 선행 문서(체커 가이드/프롬프트/판정 계약)는 필요하지 않다 — 입력은 xls 하나뿐이다.
-            string outputRoot = ResolveTrackCOutputRoot(inputXls, TrackCOutputPathBox.Text);
+            string outputRoot = ResolveXlsOutputRoot(inputXls, XlsOutputPathBox.Text);
             var log = new DispatcherTextWriter(Dispatcher, AppendLog);
 
             DateTime startedUtc = DateTime.UtcNow;
@@ -1067,10 +1067,10 @@ namespace SparrowRunner.Gui
             return await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ExportOptions exportOptions = BuildTrackCExportOptions(inputXls, outputRoot, sourceRoot, filesFrom);
+                ExportOptions exportOptions = BuildXlsSplitOptions(inputXls, outputRoot, sourceRoot, filesFrom);
 
                 log.WriteLine("");
-                log.WriteLine(">>> Track C 체커별 md 분리");
+                log.WriteLine(">>> [XLS 분리] 체커별 md 분리");
                 log.WriteLine("입력 XLS  : " + inputXls);
                 log.WriteLine("출력 폴더 : " + outputRoot);
                 ExportResult parse = SparrowExporter.Run(exportOptions, null);
@@ -1102,18 +1102,18 @@ namespace SparrowRunner.Gui
 
                 // 실행 리포트(기계 판독용)는 로그 폴더에만 쓴다 — 출력 폴더는 "체커 폴더 + 항목 md만" 계약을 유지한다.
                 elapsed.Stop();
-                WriteTrackCReport(exportOptions, parse, map, startedUtc, elapsed.ElapsedMilliseconds, log);
+                WriteXlsSplitReport(exportOptions, parse, map, startedUtc, elapsed.ElapsedMilliseconds, log);
 
                 return parse.OutputDir;
             }, cancellationToken);
         }
 
-        // Track C 실행 1회의 진단 리포트(json + 사람이 읽는 .log 요약)를 세션 로그 폴더에 남긴다. 어떤 실패도
+        // [XLS 분리] 실행 1회의 진단 리포트(json + 사람이 읽는 .log 요약)를 세션 로그 폴더에 남긴다. 어떤 실패도
         // 실행 결과를 바꾸지 않는다(경고만 로그). 출력 폴더에는 절대 쓰지 않는다.
-        private void WriteTrackCReport(ExportOptions exportOptions, ExportResult parse, MapResult map,
+        private void WriteXlsSplitReport(ExportOptions exportOptions, ExportResult parse, MapResult map,
                                        DateTime startedUtc, long elapsedMs, TextWriter log)
         {
-            string? reportPath = _sessionLog.NewTrackCReportPath();
+            string? reportPath = _sessionLog.NewXlsSplitReportPath();
             if (reportPath == null)
             {
                 log.WriteLine("실행 리포트: 로그 폴더를 쓸 수 없어 생략했습니다 (" + _sessionLog.LogDirectory + ")");
@@ -1122,8 +1122,8 @@ namespace SparrowRunner.Gui
 
             try
             {
-                TrackCRunReport payload = TrackCReportWriter.Build(exportOptions, parse, map, _guidesDir, startedUtc, elapsedMs);
-                if (TrackCReportWriter.TryWrite(reportPath, payload, out string? error))
+                XlsSplitRunReport payload = XlsSplitReportWriter.Build(exportOptions, parse, map, _guidesDir, startedUtc, elapsedMs);
+                if (XlsSplitReportWriter.TryWrite(reportPath, payload, out string? error))
                 {
                     log.WriteLine("실행 리포트: " + reportPath);
                 }
@@ -1138,7 +1138,7 @@ namespace SparrowRunner.Gui
             }
         }
 
-        private ExportOptions BuildTrackCExportOptions(string inputXls, string outputDir, string sourceRoot, string filesFrom)
+        private ExportOptions BuildXlsSplitOptions(string inputXls, string outputDir, string sourceRoot, string filesFrom)
         {
             // 전건 수정 정책: 심각도/체커/Max 필터 없이 Sparrow 검출 전건을 대상으로 한다.
             // (범위 필터 filesFrom/RootPath 은 팀 분담용 파일/폴더 선택이며 검출 제외가 아님.)
@@ -1153,10 +1153,10 @@ namespace SparrowRunner.Gui
 
         // xls 를 고른 순간(실행 전) 검출 체커를 파싱해(SparrowExporter.ListCheckers — 어떤 파일도 쓰지 않음) 메인
         // 요약을 즉시 채운다. xls 가 비었거나 없으면 빈 상태. 세대 번호로 겹친 갱신 중 마지막만 반영한다.
-        private async Task RefreshTrackCSummaryFromXlsAsync()
+        private async Task RefreshCheckerSummaryFromXlsAsync()
         {
             int gen = ++_mappingRefreshGen;
-            string xls = TrackCXlsPathBox.Text.Trim().Trim('"');
+            string xls = XlsPathBox.Text.Trim().Trim('"');
             List<(string Key, int Count)> checkers;
             if (string.IsNullOrEmpty(xls) || !File.Exists(xls))
             {
@@ -1169,13 +1169,13 @@ namespace SparrowRunner.Gui
             }
 
             if (gen != _mappingRefreshGen) return;   // 더 나중에 시작된 갱신이 있음 → 오래된 결과 폐기
-            _trackCCheckers = checkers;
-            UpdateTrackCMappingSummary();
-            _ruleManager?.UpdateCheckers(_trackCCheckers);   // 관리창이 열려 있으면 체커 매핑 목록도 갱신
+            _xlsCheckers = checkers;
+            UpdateCheckerMappingSummary();
+            _ruleManager?.UpdateCheckers(_xlsCheckers);   // 관리창이 열려 있으면 체커 매핑 목록도 갱신
         }
 
         // 실행 후: 출력 폴더의 검출 체커(CheckerRuleMapper.ListCheckers)로 요약을 갱신한다(지정 반영 후 상태).
-        private async Task RefreshTrackCSummaryFromOutputAsync(string? outputDir)
+        private async Task RefreshCheckerSummaryFromOutputAsync(string? outputDir)
         {
             int gen = ++_mappingRefreshGen;
             List<(string Key, int Count)> checkers;
@@ -1190,29 +1190,29 @@ namespace SparrowRunner.Gui
             }
 
             if (gen != _mappingRefreshGen) return;
-            _trackCCheckers = checkers;
-            UpdateTrackCMappingSummary();
-            _ruleManager?.UpdateCheckers(_trackCCheckers);
+            _xlsCheckers = checkers;
+            UpdateCheckerMappingSummary();
+            _ruleManager?.UpdateCheckers(_xlsCheckers);
         }
 
         // 메인 요약 "검출 체커 N종 · 매핑 M · 미매핑 K"(지정 기준: assignment 가 있고 그 규칙 파일이 실제 존재하는
         // 체커만 매핑으로 센다 — 실행 시 실제 부착되는 것과 일치). 파일명이 체커키와 같아도 지정 안 했으면 미매핑.
-        private void UpdateTrackCMappingSummary()
+        private void UpdateCheckerMappingSummary()
         {
-            int total = _trackCCheckers.Count;
+            int total = _xlsCheckers.Count;
             if (total == 0)
             {
-                TrackCMappingSummary.Text = "XLS를 선택하면 검출 체커가 요약됩니다.";
+                CheckerMappingSummary.Text = "XLS를 선택하면 검출 체커가 요약됩니다.";
                 return;
             }
 
             Dictionary<string, string> assignments = CheckerRuleStore.LoadAssignments(_guidesDir);
-            int mapped = _trackCCheckers.Count(c =>
+            int mapped = _xlsCheckers.Count(c =>
                 assignments.TryGetValue(c.Key, out string? rule)
                 && !string.IsNullOrWhiteSpace(rule)
                 && CheckerRuleStore.RuleExists(_guidesDir, rule!));
             int unmapped = total - mapped;
-            TrackCMappingSummary.Text = "검출 체커 " + total + "종 · 매핑 " + mapped + " · 미매핑 " + unmapped;
+            CheckerMappingSummary.Text = "검출 체커 " + total + "종 · 매핑 " + mapped + " · 미매핑 " + unmapped;
         }
 
         private void OpenRuleManagerButton_Click(object sender, RoutedEventArgs e)
@@ -1228,15 +1228,15 @@ namespace SparrowRunner.Gui
             if (_ruleManager != null)
             {
                 try { _ruleManager.Activate(); } catch { /* 창이 닫히는 중일 수 있음 */ }
-                _ruleManager.UpdateCheckers(_trackCCheckers);
+                _ruleManager.UpdateCheckers(_xlsCheckers);
                 return;
             }
 
-            var win = new RuleManagerWindow(_guidesDir, _trackCCheckers) { Owner = this };
+            var win = new RuleManagerWindow(_guidesDir, _xlsCheckers) { Owner = this };
             win.Closed += (_, _) =>
             {
                 _ruleManager = null;
-                UpdateTrackCMappingSummary();   // 지정 변경(_assignments.json) 반영
+                UpdateCheckerMappingSummary();   // 지정 변경(_assignments.json) 반영
             };
             _ruleManager = win;
             win.Show();
@@ -1244,7 +1244,7 @@ namespace SparrowRunner.Gui
             _snapshots?.CaptureWhenIdle(win, "manager-open");
         }
 
-        private static string ResolveTrackCOutputRoot(string inputXls, string configuredOutput)
+        private static string ResolveXlsOutputRoot(string inputXls, string configuredOutput)
         {
             string trimmed = configuredOutput.Trim().Trim('"');
             if (!string.IsNullOrEmpty(trimmed))
@@ -1443,9 +1443,9 @@ namespace SparrowRunner.Gui
         {
             if (!IsLoaded) return;
 
-            ActiveTrack track = CurrentTrack();
+            ActiveMode mode = CurrentMode();
             UpdateXlsScopeSummary();
-            SectionHintText.Text = track == ActiveTrack.C
+            SectionHintText.Text = mode == ActiveMode.XlsSplit
                 ? "XLS 분리: 입력은 XLS 하나입니다. 프로젝트 경로가 필요 없고 소스를 수정하지 않습니다."
                 // 커밋 여부는 [규칙별 커밋 생성] 상태에 따라 달라지므로 여기서 단정하지 않는다.
                 // 그건 모드에 따라 갈리는 요약바(ModeNotice)와 실행 로그(ModeRunLogLine)가 말한다.
@@ -1465,30 +1465,30 @@ namespace SparrowRunner.Gui
                 ? "대상 경로가 필요합니다."
                 : target;
 
-            switch (track)
+            switch (mode)
             {
-                case ActiveTrack.A:
+                case ActiveMode.CodeRule:
                 {
                     int count = CountChecked(ASObjectVarSafe, ASObviousVar, ASArrayVarSafe, ASParens, ASForeachCast,
                         ASObjectInitializer, ASNullVar, ASObjectVarNarrowing, ASLocalConst, ASArrayVarNarrowing,
                         ASForVar, ASFieldSplit, ASEmptyStmt, ASForHoist);
-                    int review = CountChecked(ReviewNeededTrackARules);
+                    int review = CountChecked(ReviewNeededCodeRules);
                     SummaryRulesText.Text = $"코드 규칙 · 선택 {count}개";
                     SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
                     break;
                 }
-                case ActiveTrack.B:
+                case ActiveMode.Comment:
                 {
                     int count = CountChecked(BTrailing, BSpace, BPeriod, BCapitalize, BFlatten, BMemberBlank,
                         BOneDeclaration, BOneStatement, BContinuation, BLinqAlign, BBlockPromote);
-                    int review = CountChecked(ReviewNeededTrackBRules);
+                    int review = CountChecked(ReviewNeededCommentRules);
                     SummaryRulesText.Text = $"주석·레이아웃 · 선택 {count}개";
                     SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
                     break;
                 }
-                case ActiveTrack.C:
+                case ActiveMode.XlsSplit:
                 {
-                    // A/B 요약 패널은 XLS 화면에 보이지 않는다(범위·체커 요약은 그 화면 자체에 있다). 화면을
+                    // 자동수정 요약 패널은 XLS 화면에 보이지 않는다(범위·체커 요약은 그 화면 자체에 있다). 화면을
                     // 되돌렸을 때 남은 문구가 오해를 주지 않도록 값만 정리해 둔다.
                     SummaryRulesText.Text = "XLS 분리 실행 중이거나 대기 중";
                     SummaryModeText.Text = "XLS → 체커별 폴더 md 분리(<체커 키>\\{ID}_{파일명}_{라인}.md)";
@@ -1544,9 +1544,9 @@ namespace SparrowRunner.Gui
 
         private void SetRunning(bool running)
         {
-            // 실행 중에는 무조건 비활성. 종료 후에는 활성 트랙(옵션 탭이면 비활성)에 맞춰 상태를 복원한다.
+            // 실행 중에는 무조건 비활성. 종료 후에는 활성 기능(옵션 탭이면 비활성)에 맞춰 상태를 복원한다.
             if (running) RunButton.IsEnabled = false;
-            else UpdateRunButtonForTrack();
+            else UpdateRunButtonForMode();
             StopButton.IsEnabled = running;
             BrowseFileButton.IsEnabled = !running;
             BrowseFolderButton.IsEnabled = !running;
@@ -1554,17 +1554,17 @@ namespace SparrowRunner.Gui
             SelectAllScopeButton.IsEnabled = !running;
             ClearScopeButton.IsEnabled = !running;
             ScopeTree.IsEnabled = !running;
-            BrowseTrackCXlsButton.IsEnabled = !running;
-            BrowseTrackCOutputButton.IsEnabled = !running;
+            BrowseXlsButton.IsEnabled = !running;
+            BrowseXlsOutputButton.IsEnabled = !running;
             SelectAllXlsScopeButton.IsEnabled = !running;
             ClearXlsScopeButton.IsEnabled = !running;
             XlsScopeTree.IsEnabled = !running;
-            // 실행 중 대분류 전환 금지(실행 트랙이 화면 선택으로 정해지므로 도중에 바뀌면 안 된다).
+            // 실행 중 대분류 전환 금지(실행 기능이 화면 선택으로 정해지므로 도중에 바뀌면 안 된다).
             SectionTabs.IsEnabled = !running;
             RulesTabs.IsEnabled = !running;
             TargetPathBox.IsEnabled = !running;
-            TrackCXlsPathBox.IsEnabled = !running;
-            TrackCOutputPathBox.IsEnabled = !running;
+            XlsPathBox.IsEnabled = !running;
+            XlsOutputPathBox.IsEnabled = !running;
             StatusText.Text = running ? "실행 중..." : "대기 중";
         }
 
@@ -1664,23 +1664,23 @@ namespace SparrowRunner.Gui
         }
 
         // 기동 인자 파서: GUI를 테스트에서 알려진 상태로 자동 구동하기 위한 최소 옵션.
-        //   --trackc-xls <path>   : Track C 탭 선택 + XLS 경로 프리필
-        //   --trackc-out <dir>    : Track C 출력 폴더 프리필
+        //   --xls <path>          : [XLS 분리] 탭 선택 + XLS 경로 프리필
+        //   --xls-out <dir>       : [XLS 분리] 출력 폴더 프리필
         //   --guides-dir <dir>    : 체커 규칙 라이브러리/지정 폴더 override (실 references\checkers 오염 방지)
-        //   --log-dir <dir>       : 세션 로그/Track C 리포트 폴더 override (기본 %LOCALAPPDATA%\SparrowRunner\logs)
-        //   --screenshot-dir <dir>: 창 스냅샷 PNG 폴더. 주면 자동 지점(메인창 로드/관리창 오픈/Track C 완료)에서
+        //   --log-dir <dir>       : 세션 로그/[XLS 분리] 리포트 폴더 override (기본 %LOCALAPPDATA%\SparrowRunner\logs)
+        //   --screenshot-dir <dir>: 창 스냅샷 PNG 폴더. 주면 자동 지점(메인창 로드/관리창 오픈/[XLS 분리] 완료)에서
         //                           스스로 캡처하고, 그 폴더에 capture.request 파일이 생기면 활성 창을 즉시 캡처한다.
         //                           주지 않으면 스냅샷 기능 전체가 비활성이다(기존 동작 불변).
-        //   --trackc-autorun      : 로드 완료 후 Track C 실행 자동 트리거
+        //   --xls-autorun         : 로드 완료 후 [XLS 분리] 실행 자동 트리거
         //   --open-rule-manager   : 로드 완료 후 [체커 규칙 관리] 창 자동 오픈(검출 체커 로드된 상태)
         private sealed class StartupOptions
         {
-            public string? TrackCXls { get; private set; }
-            public string? TrackCOut { get; private set; }
+            public string? Xls { get; private set; }
+            public string? XlsOut { get; private set; }
             public string? GuidesDir { get; private set; }
             public string? LogDir { get; private set; }
             public string? ScreenshotDir { get; private set; }
-            public bool TrackCAutorun { get; private set; }
+            public bool XlsAutorun { get; private set; }
             public bool OpenRuleManager { get; private set; }
 
             public static StartupOptions Parse(string[] args)
@@ -1694,11 +1694,11 @@ namespace SparrowRunner.Gui
                     string a = args[i] ?? "";
                     switch (a)
                     {
-                        case "--trackc-xls":
-                            o.TrackCXls = NextValue(args, ref i);
+                        case "--xls":
+                            o.Xls = NextValue(args, ref i);
                             break;
-                        case "--trackc-out":
-                            o.TrackCOut = NextValue(args, ref i);
+                        case "--xls-out":
+                            o.XlsOut = NextValue(args, ref i);
                             break;
                         case "--guides-dir":
                             o.GuidesDir = NextValue(args, ref i);
@@ -1709,8 +1709,8 @@ namespace SparrowRunner.Gui
                         case "--screenshot-dir":
                             o.ScreenshotDir = NextValue(args, ref i);
                             break;
-                        case "--trackc-autorun":
-                            o.TrackCAutorun = true;
+                        case "--xls-autorun":
+                            o.XlsAutorun = true;
                             break;
                         case "--open-rule-manager":
                             o.OpenRuleManager = true;

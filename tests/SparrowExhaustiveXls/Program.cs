@@ -1,6 +1,6 @@
-// SparrowExhaustiveXls: EXHAUSTIVE generator for the Sparrow Track A/B xls coverage test.
+// SparrowExhaustiveXls: EXHAUSTIVE generator for the Sparrow [코드 규칙]·[주석·레이아웃] xls coverage test.
 //
-// Reads the real MyApp issues .xls (NPOI, BIFF), and for EVERY Track A/B-relevant finding (none skipped)
+// Reads the real MyApp issues .xls (NPOI, BIFF), and for EVERY [코드 규칙]·[주석·레이아웃]-relevant finding (none skipped)
 // extracts the REAL flagged code line + just enough of the "소스 코드" context to PARSE, wraps it minimally
 // into a compilation unit, validates that it parses with the SAME Roslyn version the tools use, writes a
 // per-checker batch of .cs files, and emits a manifest mapping finding -> generated file + original flagged
@@ -25,7 +25,7 @@ namespace SparrowExhaustiveXls
 {
     internal static class Program
     {
-        // ---- Track A/B checker configuration -----------------------------------------------------------
+        // ---- [코드 규칙]·[주석·레이아웃] checker configuration -----------------------------------------------------------
         // slug     : output subdir + manifest key
         // tool     : "syntax" | "comment"
         // rules    : the --rules string passed to the tool for this checker
@@ -43,13 +43,13 @@ namespace SparrowExhaustiveXls
 
         private static readonly CheckerCfg[] Checkers =
         {
-            // ---- Track A (SparrowSyntaxFix) ----
+            // ---- [코드 규칙] (SparrowSyntaxFix) ----
             new CheckerCfg{ Key="PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING", Slug="A_obviousvar", Tool="syntax", Rules="nullvar,obviousvar,objectvar-safe,foreachcast", Mode="single", Wrapper="method" },
             new CheckerCfg{ Key="PRACTICE.OBJECT_INSTANTIATION.NOT_USED_IMPLICIT_TYPING", Slug="A_objinst", Tool="syntax", Rules="nullvar,obviousvar,objectvar-safe,foreachcast", Mode="single", Wrapper="method" },
             new CheckerCfg{ Key="PRACTICE.LOOP_VARIABLE.NOT_USED_IMPLICIT_TYPING", Slug="A_loopvar", Tool="syntax", Rules="nullvar,obviousvar,objectvar-safe,foreachcast", Mode="single", Wrapper="method" },
             new CheckerCfg{ Key="MISSING_PARENTHESIS_IN_EXPRESSION", Slug="A_parens", Tool="syntax", Rules="parens", Mode="sym", Wrapper="method" },
             new CheckerCfg{ Key="PRACTICE.OBJECT_INITIALIZATION.NOT_USED_INITIALIZER", Slug="A_objinit", Tool="syntax", Rules="objectinitializer", Mode="fwd", Wrapper="method", Note="review-needed; guarded/conditional inits are expected NOT to transform" },
-            // ---- Track B (SparrowCommentFix) ----
+            // ---- [주석·레이아웃] (SparrowCommentFix) ----
             new CheckerCfg{ Key="FORMATTING.COMMENT.MISSING_SPACE_AFTER_DELIMITER", Slug="B_space", Tool="comment", Rules="space", Mode="single", Wrapper="comment" },
             new CheckerCfg{ Key="FORMATTING.COMMENT.MISSING_PERIOD", Slug="B_period", Tool="comment", Rules="period", Mode="single", Wrapper="comment" },
             new CheckerCfg{ Key="FORMATTING.COMMENT.LOWERCASE_FIRST_LETTER", Slug="B_capitalize", Tool="comment", Rules="capitalize", Mode="single", Wrapper="comment" },
@@ -203,7 +203,7 @@ namespace SparrowExhaustiveXls
                               + (new FileInfo(xls).Length / 1024) + " KB)");
             Console.WriteLine("gen root:          " + Path.GetFullPath(genRoot));
             Console.WriteLine("total checker rows:" + totalRows);
-            Console.WriteLine("track A/B kept:    " + abTotal);
+            Console.WriteLine("autofix kept:      " + abTotal);
             Console.WriteLine("excluded metadata: " + excludedMeta);
             Console.WriteLine("--- per checker (generated / parse-fail / no-flagged) ---");
             foreach (var c in Checkers)

@@ -3,7 +3,7 @@ setlocal
 chcp 65001 >nul
 rem Explorer double-click entry point for the GUI.
 rem   * Arguments are forwarded verbatim (%*) so the documented switches
-rem     (--trackc-xls / --trackc-out / --trackc-autorun / --log-dir / --screenshot-dir / --guides-dir) work here too.
+rem     (--xls / --xls-out / --xls-autorun / --log-dir / --screenshot-dir / --guides-dir) work here too.
 rem   * Every failure branch PAUSEs: without it the error text flashes and the window closes, leaving no diagnosis.
 rem Kept ASCII-only on purpose (the other .cmd entry points are too) so the console codepage cannot mojibake it.
 set "PUBEXE=%~dp0SparrowRunner.Gui\publish\SparrowRunner.Gui.exe"

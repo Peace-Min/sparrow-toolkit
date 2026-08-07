@@ -1,4 +1,4 @@
-﻿# Track A Roslyn 보강 정책 — Sparrow 코드 규칙 CLI
+﻿# 코드 규칙 Roslyn 보강 정책 — Sparrow 코드 규칙 CLI
 
 > **문서 성격**: 이것은 **작성 시점(2026-07)의 설계 기록**이다. "현재 2개 규칙만 구현되어 있다" 같은
 > 현황 서술은 이미 낡았다 — 지금은 규칙 키가 14개다. 이 문서의 가치는 현황이 아니라
@@ -6,7 +6,7 @@
 > 현행 규칙 목록과 계약은 [엔진 README](../tools/_internal/SparrowSyntaxFix/README.md) 를,
 > 새 규칙을 추가하는 절차는 [docs/extending.md](../docs/extending.md) 를 본다.
 
-## Track A Roslyn 원샷 CLI 운영 원칙
+## 코드 규칙 Roslyn 원샷 CLI 운영 원칙
 
 이 문서의 규칙명은 설계와 테스트를 위한 식별자다. 일반 사용자는 `SparrowSyntaxFix --rules foreachcast`처럼 직접 호출하지 않고, 통합 GUI `tools/Run-SparrowRunnerGui.cmd`에서 체크박스로 선택한다. 테스트/자동화에서만 `tools/_internal/SparrowSyntaxFix/Run-SparrowSyntaxFix.ps1`를 직접 실행한다.
 
@@ -15,7 +15,7 @@
 - `-Rules`는 테스트, 자동화, 특정 규칙 재실행용 예외 경로다.
 - 위험 규칙 커밋은 `검토필요`가 드러나도록 분리한다.
 
-이 문서는 `issues_sample_6869.xls` 재분석 결과를 기준으로, Track A의 다음 구현 범위를 확정한 설계안이다.
+이 문서는 `issues_sample_6869.xls` 재분석 결과를 기준으로, [코드 규칙] 갈래의 다음 구현 범위를 확정한 설계안이다.
 핵심 결론은 단순하다. **스캔 제외 설정은 후순위이고, 우선 `SparrowSyntaxFix`가 Sparrow의 코드 규칙 검출을 실제로 줄이도록 Roslyn 규칙을 확장한다.**
 
 ## 현재 상태 (작성 시점)
@@ -27,7 +27,7 @@
 | `nullcast` | `Foo x = null;` → `var x = (Foo)null;` |
 | `parens` | `&&` / `||` 피연산자 괄호 보강 |
 
-따라서 `Track A 완료`라는 표현은 부정확하다. 더 정확한 상태는 **Track A 일부 완료**다. 괄호와 null initializer
+따라서 `[코드 규칙] 완료`라는 표현은 부정확하다. 더 정확한 상태는 **일부 완료**다. 괄호와 null initializer
 잉여는 처리했지만, 명시 타입 var 계열 대부분은 아직 CLI 규칙으로 구현되지 않았다.
 
 6869 재분석 기준 잔여:
@@ -75,7 +75,7 @@ var y = new Foo(arg1, arg2);
 기본 커밋명:
 
 ```text
-sparrow(A): object instantiation var safe
+sparrow(rule): object instantiation var safe
 ```
 
 ### 2. `objectvar-narrowing` — 검토필요
@@ -100,8 +100,8 @@ extension method binding이 달라질 수 있다. 따라서 자동화는 허용�
 커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
-sparrow(A)! review-needed: static type narrowing to var
-sparrow(A)! 검토필요: 인터페이스 기반 타입 var 변환
+sparrow(rule)! review-needed: static type narrowing to var
+sparrow(rule)! 검토필요: 인터페이스 기반 타입 var 변환
 ```
 
 ### 3. `foreachcast`
@@ -127,7 +127,7 @@ skip 조건:
 커밋명:
 
 ```text
-sparrow(A): foreach implicit type with Cast<T>
+sparrow(rule): foreach implicit type with Cast<T>
 ```
 
 ### 4. `obviousvar`
@@ -175,7 +175,7 @@ var pageSize = (int?)0;
 커밋명:
 
 ```text
-sparrow(A): obvious local var conversions
+sparrow(rule): obvious local var conversions
 ```
 
 ### 5. `localconst` — 검토필요
@@ -205,8 +205,8 @@ constant 요구 위치에 쓰인 경우 깨질 수 있으므로 별도 규칙/�
 커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
-sparrow(A)! review-needed: demote local const to var
-sparrow(A)! 검토필요: 지역 const var 변환
+sparrow(rule)! review-needed: demote local const to var
+sparrow(rule)! 검토필요: 지역 const var 변환
 ```
 
 ### 6. `nullvar` — 검토필요
@@ -239,8 +239,8 @@ skip 조건:
 커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
-sparrow(A)! review-needed: initialize explicit locals as typed null
-sparrow(A)! 검토필요: 미초기화 지역 변수 typed-null var 변환
+sparrow(rule)! review-needed: initialize explicit locals as typed null
+sparrow(rule)! 검토필요: 미초기화 지역 변수 typed-null var 변환
 ```
 
 ## 권장 실행 순서
@@ -302,5 +302,5 @@ sparrow(A)! 검토필요: 미초기화 지역 변수 typed-null var 변환
 - 규칙별 fixture 통과.
 - `SparrowSyntaxFix` 두 번째 실행 시 idempotent.
 - 대상 솔루션 빌드 통과.
-- Sparrow 재분석에서 해당 Track A 체커 건수가 감소.
+- Sparrow 재분석에서 해당 코드 규칙 체커 건수가 감소.
 - 검토필요 규칙은 별도 커밋으로 분리되어 있어야 한다.

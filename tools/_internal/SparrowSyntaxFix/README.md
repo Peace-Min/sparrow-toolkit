@@ -1,12 +1,12 @@
 # SparrowSyntaxFix
 
-Deterministic Roslyn source rewriter for Sparrow (스패로우 정적분석) Track A code-rule findings that the
+Deterministic Roslyn source rewriter for the Sparrow (스패로우 정적분석) 코드 규칙 findings that the
 now-deleted `dotnet format` runner did not fully clear on the legacy **MyApp** project (.NET Framework 4.7.2,
 non-SDK `.csproj`). It parses C# source text with Roslyn **syntax** APIs only — it never loads an MSBuild
 project — and rewrites at the syntax level, preserving all trivia (comments/whitespace/newlines). No
 string/regex editing of code, ever.
 
-The design policy behind these rules is `../../../references/track-a-roslyn-policy.md`. The CLI currently
+The design policy behind these rules is `../../../references/code-rule-roslyn-policy.md`. The CLI currently
 accepts **14 rule keys** (`SyntaxRule` in `RewriteEngine.cs` is the single source of truth):
 `nullvar` (alias `nullcast`), `parens`, `objectvar-safe`, `foreachcast`, `obviousvar`,
 `objectvar-narrowing`, `localconst`, `objectinitializer`, `arrayvar-safe`, `arrayvar-narrowing`,
@@ -17,11 +17,11 @@ single run (otherwise the same rewriter ran twice and produced two identical com
 
 **`review-needed` 단일 진실은 아래 규칙 표의 `Commit policy` 열이다.** 러너(`Run-SparrowSyntaxFix.ps1`)의
 커밋 라벨과 GUI 체크박스 라벨/검토필요 카운트는 전부 이 표를 따라간다 — 표에서 `review-needed` 인 규칙은
-러너 라벨이 `검토필요:` 로 시작하고(→ 커밋 접두 `sparrow(A)! `), GUI 라벨이 `[검토필요] ` 로 시작하며
+러너 라벨이 `검토필요:` 로 시작하고(→ 커밋 접두 `sparrow(rule)! `), GUI 라벨이 `[검토필요] ` 로 시작하며
 GUI 요약의 "검토필요 N" 에 포함된다. 표를 고치면 그 세 곳을 함께 고쳐야 한다
 (`docs/extending.md` 레시피 1 의 체크리스트).
 
-Adding a rule? See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-트랙에-규칙-추가) —
+Adding a rule? See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-갈래에-규칙-추가) —
 it lists every touch point (rewriter file, enum flag, `Program.cs` switch, runner labels, GUI checkbox, fixtures).
 
 ## Implemented rules
@@ -42,7 +42,7 @@ Matches ONLY a plain, single-declarator **local** statement whose sole initializ
 literal. Hard skips (left byte-identical):
 
 - `= new ...` (object creation) — not handled by `nullvar`. The next policy splits this into
-  `objectvar-safe` and `objectvar-narrowing` (review-needed); see `track-a-roslyn-policy.md`.
+  `objectvar-safe` and `objectvar-narrowing` (review-needed); see `code-rule-roslyn-policy.md`.
 - `= default` / `= default(T)` — out of scope.
 - any non-`null` initializer (method call, member access, ternary, ...).
 - already `var`; multi-declarator (`Foo a = null, b = null;`); `const`; `using` locals; fields/properties.
@@ -72,7 +72,7 @@ partially-parenthesized expression from an earlier pass (`(a) || b`) is complete
 
 Both rules are **idempotent**: running twice makes no further change.
 
-## Track A expansion rules
+## 코드 규칙 expansion rules
 
 All **14** CLI rule keys, with their commit policy. This table is the single source of truth for
 `review-needed` (see the note at the top); `nullcast` is not listed because it is only an alias of `nullvar`.
@@ -98,10 +98,10 @@ All **14** CLI rule keys, with their commit policy. This table is the single sou
 commit names:
 
 ```text
-sparrow(A)! review-needed: static type narrowing to var
-sparrow(A)! review-needed: simplify array declaration with static type narrowing
-sparrow(A)! review-needed: demote local const to var
-sparrow(A)! review-needed: initialize explicit locals as typed null
+sparrow(rule)! review-needed: static type narrowing to var
+sparrow(rule)! review-needed: simplify array declaration with static type narrowing
+sparrow(rule)! review-needed: demote local const to var
+sparrow(rule)! review-needed: initialize explicit locals as typed null
 ```
 
 ## One-shot runner policy
@@ -122,7 +122,7 @@ SparrowSyntaxFix <file-or-dir>... [options]
   --files-from <files.csv>  read target .cs paths from a CSV (파일명/경로 column) or a newline list;
                             relative paths resolve against --root
   --root <dir>              base directory for resolving relative paths (default: current dir)
-  --rules <list>            comma list of Track A rules or 'all' (default: safe subset)
+  --rules <list>            comma list of rules or 'all' (default: safe subset)
   --dry-run                 report per-file / per-rule counts without writing
   -h, --help                print this usage and exit 0
 
@@ -151,7 +151,7 @@ emitted from `RuleOrder`, which only holds canonical keys.)
 
 ## One-call runner — `Run-SparrowSyntaxFix.ps1` (권장)
 
-솔루션(.sln)/소스 폴더 경로만 주면 동작하는 PowerShell 러너(Track A 2단계). 내부에서 exe를 확보한 뒤 규칙별로
+솔루션(.sln)/소스 폴더 경로만 주면 동작하는 PowerShell 러너(코드 규칙 2단계). 내부에서 exe를 확보한 뒤 규칙별로
 실행하고 규칙별로 커밋한다(검수 가능한 단위). 일반 운영은 이 러너로 하고, 직접 `SparrowSyntaxFix --rules ...`
 호출은 테스트/자동화/정밀 재실행에만 쓴다.
 

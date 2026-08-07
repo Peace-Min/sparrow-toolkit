@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- E2E mini-project with PLANTED Track C defects. LangVersion 7.3 enforces that the
+  <!-- E2E mini-project with PLANTED [XLS 분리] defects. LangVersion 7.3 enforces that the
        guide fix patterns are valid C# 7.3 (no using-declarations, no switch-expressions,
        no nullable reference types). Files compile as-is (flawed but legal). -->
   <PropertyGroup>

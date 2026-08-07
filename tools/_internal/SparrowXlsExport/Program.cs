@@ -118,14 +118,14 @@ namespace SparrowXlsExport
                 if (report != null)
                 {
                     sw.Stop();
-                    TrackCRunReport payload = TrackCReportWriter.Build(opts, result, mapResult, guidesFull,
+                    XlsSplitRunReport payload = XlsSplitReportWriter.Build(opts, result, mapResult, guidesFull,
                                                                       startedUtc, sw.ElapsedMilliseconds);
                     string reportFull = Path.GetFullPath(report.Trim().Trim('"'));
-                    if (TrackCReportWriter.TryWrite(reportFull, payload, out string? reportError))
+                    if (XlsSplitReportWriter.TryWrite(reportFull, payload, out string? reportError))
                     {
                         Console.Out.WriteLine();
                         Console.Out.WriteLine("run report:        " + reportFull);
-                        Console.Out.WriteLine("run report (log):  " + TrackCReportWriter.CompanionLogPath(reportFull));
+                        Console.Out.WriteLine("run report (log):  " + XlsSplitReportWriter.CompanionLogPath(reportFull));
                     }
                     else
                     {

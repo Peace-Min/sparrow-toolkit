@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 <#
-    run-e2e.ps1 — END-TO-END integration test for the Sparrow (파수) Track C export pipeline.
+    run-e2e.ps1 — END-TO-END integration test for the Sparrow (파수) [XLS 분리] export pipeline.
 
     Exercises the REAL pieces (parser exe + tools\Compare-Sparrow.ps1) against a realistic mini C#
     project with planted defects and generated Sparrow-style .xls. 선행 문서(체커 가이드/프롬프트)는
@@ -55,7 +55,7 @@ function Read-TextNoBom {
     return $t
 }
 
-Write-Host "==================== Sparrow Track C E2E ===================="
+Write-Host "==================== Sparrow [XLS 분리] E2E ===================="
 Write-Host ("ScriptDir : {0}" -f $ScriptDir)
 Write-Host ("Parser    : {0}" -f $ParserExe)
 Write-Host ("Compare   : {0}" -f $Compare)

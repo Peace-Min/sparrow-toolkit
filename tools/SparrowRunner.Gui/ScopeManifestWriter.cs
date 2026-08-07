@@ -16,7 +16,7 @@ namespace SparrowRunner.Gui
         }
 
         /// <summary>
-        /// XLS 범위 트리(Track C)용 manifest: 항목을 <b>xls 가 적어 둔 그대로</b> 기록한다(Path.GetFullPath 로
+        /// XLS 범위 트리([XLS 분리])용 manifest: 항목을 <b>xls 가 적어 둔 그대로</b> 기록한다(Path.GetFullPath 로
         /// 로컬 경로화하지 않는다 — 그 순간 다른 PC 의 경로가 이 PC 기준으로 변질된다). 익스포터는 이 문자열을
         /// 같은 xls 의 경로와 그대로 대조하므로(Tier 0) 매칭이 100% 정확하고 언어와 무관하다.
         /// </summary>

@@ -12,7 +12,7 @@ namespace SparrowRunner.Gui
         private bool _isExpanded;
         private bool _updating;
 
-        // initialChecked: 로컬 소스 범위(Track A/B)는 전체 선택으로 시작하고(기존 동작), xls 범위 트리(Track C)는
+        // initialChecked: 로컬 소스 범위([코드 규칙]·[주석·레이아웃])는 전체 선택으로 시작하고(기존 동작), xls 범위 트리([XLS 분리])는
         // 아무것도 선택하지 않은 상태로 시작한다(미선택 = 전건 익스포트).
         public SourceScopeNode(string name, string fullPath, bool isFile, SourceScopeNode? parent = null,
                               bool initialChecked = true)
@@ -35,7 +35,7 @@ namespace SparrowRunner.Gui
         public ObservableCollection<SourceScopeNode> Children { get; }
 
         /// <summary>Detections carried by this node (xls 범위 트리: 파일=그 파일의 검출 건수, 폴더=하위 합계).
-        /// 0 이면 표시하지 않는다 — 로컬 소스 트리(Track A/B)는 건수 개념이 없어 기존과 동일하게 보인다.</summary>
+        /// 0 이면 표시하지 않는다 — 로컬 소스 트리([코드 규칙]·[주석·레이아웃])는 건수 개념이 없어 기존과 동일하게 보인다.</summary>
         public int ItemCount { get; set; }
 
         /// <summary>트리에 보이는 문자열. 건수가 있으면 "이름 (N건)".</summary>
