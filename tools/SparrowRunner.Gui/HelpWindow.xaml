@@ -1,0 +1,59 @@
+<Window x:Class="SparrowRunner.Gui.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sparrow Helper 도움말"
+        Width="960" Height="680" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Background="#F6F8FA"
+        FontFamily="Segoe UI, Malgun Gothic" FontSize="13">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="58"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Background="#FFFFFF" BorderBrush="#E5E8EB" BorderThickness="0,0,0,1" Padding="20,0">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Sparrow Helper 도움말" FontSize="20" FontWeight="SemiBold" Foreground="#191F28"/>
+                <TextBlock Text="왼쪽에서 도움말 항목을 선택하세요." FontSize="12" Foreground="#6B7684"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Background="#FFFFFF" BorderBrush="#E5E8EB" BorderThickness="0,0,1,0" Padding="12">
+                <TreeView x:Name="HelpTopics" SelectedItemChanged="HelpTopics_SelectedItemChanged"
+                          AutomationProperties.AutomationId="HelpTopics">
+                    <TreeViewItem Header="Sparrow Helper 시작하기" Tag="start" IsSelected="True"/>
+                    <TreeViewItem Header="코드 자동수정 (C#)" Tag="fix">
+                        <TreeViewItem Header="코드 규칙" Tag="code-rules"/>
+                        <TreeViewItem Header="주석·레이아웃" Tag="comments"/>
+                    </TreeViewItem>
+                    <TreeViewItem Header="XLS 분리 (모든 언어)" Tag="xls"/>
+                    <TreeViewItem Header="지원 언어 및 작업 안전" Tag="language-safety"/>
+                    <TreeViewItem Header="안전하게 작업하기" Tag="safety"/>
+                    <TreeViewItem Header="문제 해결 및 로그" Tag="troubleshooting"/>
+                </TreeView>
+            </Border>
+
+            <FlowDocumentScrollViewer x:Name="HelpContent" Grid.Column="1" Padding="28,20"
+                                      VerticalScrollBarVisibility="Auto"
+                                      AutomationProperties.AutomationId="HelpContent">
+                <FlowDocument FontFamily="Segoe UI, Malgun Gothic" FontSize="14" Foreground="#191F28">
+                    <Paragraph FontSize="24" FontWeight="SemiBold">Sparrow Helper 시작하기</Paragraph>
+                    <Paragraph>Sparrow Helper는 C# 소스의 정형화된 문제와 C/C++ 계열의 안전한 기본 규칙을 자동으로 수정하고, Sparrow 분석 결과 XLS를 체커별 Markdown 파일로 분리하는 도구입니다.</Paragraph>
+                    <Paragraph FontWeight="SemiBold">작업 선택</Paragraph>
+                    <List MarkerStyle="Disc">
+                        <ListItem><Paragraph><Bold>코드 자동수정 (C#)</Bold>: C# 전체 규칙과 C/C++ 계열의 안전한 기본 규칙을 원본 소스 파일에 직접 반영합니다.</Paragraph></ListItem>
+                        <ListItem><Paragraph><Bold>XLS 분리 (모든 언어)</Bold>: Sparrow XLS를 읽어 체커별 결과 파일을 만듭니다. 소스 코드는 수정하지 않습니다.</Paragraph></ListItem>
+                    </List>
+                    <Paragraph>창 어디에서든 <Bold>F1</Bold> 키를 누르면 이 도움말을 다시 열 수 있습니다.</Paragraph>
+                </FlowDocument>
+            </FlowDocumentScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

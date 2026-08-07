@@ -3,6 +3,7 @@ tools/**/bin/
 tools/**/obj/
 # publish/ = 폐쇄망 반입용 self-contained/framework-dependent 발행 산출물(publish-airgap.ps1). 머신마다 생성, 커밋 금지.
 tools/**/publish/
+tools/**/publish-*/
 SparrowRunner.Gui/**/bin/
 SparrowRunner.Gui/**/obj/
 SparrowRunner.Gui/**/publish/

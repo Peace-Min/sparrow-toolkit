@@ -14,4 +14,18 @@
     <ProjectReference Include="..\_internal\SparrowXlsExport.Core\SparrowXlsExport.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\theme-palette.png" />
+    <Resource Include="Assets\execution-log.png" />
+    <Resource Include="Assets\theme-title.png" />
+    <Resource Include="Assets\execution-log-title.png" />
+    <Resource Include="Assets\folder-open-empty.png" />
+    <Resource Include="Assets\folder-open-files.png" />
+    <Resource Include="Assets\folder-closed-empty.png" />
+    <Resource Include="Assets\folder-closed-files.png" />
+    <Resource Include="Assets\file-c.png" />
+    <Resource Include="Assets\file-cpp.png" />
+    <Resource Include="Assets\file-csharp.png" />
+  </ItemGroup>
+
 </Project>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 
 namespace SparrowRunner.Gui
@@ -31,6 +32,21 @@ namespace SparrowRunner.Gui
         public string FullPath { get; }
         public bool IsFile { get; }
         public bool HasChildren => Children.Count > 0;
+        public string SourceLanguage
+        {
+            get
+            {
+                if (!IsFile) return "None";
+
+                return Path.GetExtension(FullPath).ToLowerInvariant() switch
+                {
+                    ".c" or ".h" => "C",
+                    ".cpp" or ".cc" or ".cxx" or ".hpp" or ".hh" or ".hxx" => "Cpp",
+                    ".cs" or ".csx" => "CSharp",
+                    _ => "None"
+                };
+            }
+        }
         public SourceScopeNode? Parent { get; }
         public ObservableCollection<SourceScopeNode> Children { get; }
 

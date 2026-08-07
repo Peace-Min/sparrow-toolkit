@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- 테스트 호스트에는 .NET 10 참조 팩이 번들되어 있다. 대상 소스는 net8 호환 API만 사용한다. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\tools\SparrowRunner.Gui\CFamilyBasicFixer.cs" Link="CFamilyBasicFixer.cs" />
+  </ItemGroup>
+</Project>
