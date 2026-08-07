@@ -81,12 +81,40 @@ namespace SparrowRunner.Gui
         private const bool IncludeGeneratedFiles = false;
 
         private readonly Dictionary<string, RuleInfo> _ruleInfos = new Dictionary<string, RuleInfo>(StringComparer.Ordinal);
+        private const string CFamilyCompoundStatementsKey = "CFamily.Code.CompoundStatements";
+        private const string CFamilyFinalElseKey = "CFamily.Code.FinalElse";
+        private const string CFamilyMissingElseKey = "CFamily.Code.MissingElse";
+        private const string CFamilySwitchDefaultKey = "CFamily.Code.SwitchDefault";
+        private const string CFamilyLogicalParenthesesKey = "CFamily.Code.LogicalParentheses";
+        private const string CFamilyUnsignedSuffixKey = "CFamily.Code.UnsignedSuffix";
+        private const string CFamilyIgnoredReturnKey = "CFamily.Code.IgnoredReturn";
+        private const string CFamilySizeOfPointeeKey = "CFamily.Code.SizeOfPointee";
+        private const string CFamilyFixedWidthTypesKey = "CFamily.Code.FixedWidthTypes";
+        private const string CFamilyTrailingCommentKey = "CFamily.Comment.TrailingComment";
+        private const string CFamilyCommentSpaceKey = "CFamily.Comment.Space";
+        private const string CFamilyCommentPeriodKey = "CFamily.Comment.Period";
+        private const string CFamilyCommentCapitalizeKey = "CFamily.Comment.Capitalize";
+        private bool _cFamilyCompoundStatements = true;
+        private bool _cFamilyFinalElse;
+        private bool _cFamilyMissingElse;
+        private bool _cFamilySwitchDefault;
+        private bool _cFamilyLogicalParentheses = true;
+        private bool _cFamilyUnsignedSuffix;
+        private bool _cFamilyIgnoredReturn;
+        private bool _cFamilySizeOfPointee;
+        private bool _cFamilyFixedWidthTypes;
+        private bool _cFamilyTrailingComment = true;
+        private bool _cFamilyCommentSpace = true;
+        private bool _cFamilyCommentPeriod = true;
+        private bool _cFamilyCommentCapitalize = true;
         private CancellationTokenSource? _cts;
         private CancellationTokenSource? _scopeCts;
         private CancellationTokenSource? _xlsScopeCts;
         private Process? _currentProcess;
         private string? _lastTrackCOutputDir;
         private SourceScope? _currentScope;
+        private SourceScope? _currentCSharpScope;
+        private CancellationTokenSource? _csharpScopeCts;
 
         // XLS 분리 대분류의 범위 트리(로컬 소스 스캔이 아니라 xls 검출 경로로 만든다).
         private XlsScope? _currentXlsScope;
@@ -96,6 +124,7 @@ namespace SparrowRunner.Gui
         private int _mappingRefreshGen;
 
         public ObservableCollection<SourceScopeNode> ScopeRoots { get; } = new ObservableCollection<SourceScopeNode>();
+        public ObservableCollection<SourceScopeNode> CSharpScopeRoots { get; } = new ObservableCollection<SourceScopeNode>();
 
         /// <summary>XLS 분리 대분류의 범위 트리 루트(리프의 FullPath = xls 원본 경로 문자열).</summary>
         public ObservableCollection<SourceScopeNode> XlsScopeRoots { get; } = new ObservableCollection<SourceScopeNode>();
@@ -130,6 +159,11 @@ namespace SparrowRunner.Gui
         public MainWindow()
         {
             InitializeComponent();
+
+            // XLS를 가장 왼쪽에 배치하고 첫 화면으로 선택한다.
+            SectionTabs.Items.Remove(SectionXlsTab);
+            SectionTabs.Items.Insert(0, SectionXlsTab);
+            SectionTabs.SelectedItem = SectionXlsTab;
 
             StartupOptions startup = StartupOptions.Parse(Environment.GetCommandLineArgs());
             _skillRoot = ResolveSkillRoot();
@@ -267,7 +301,7 @@ namespace SparrowRunner.Gui
 
         private void OpenSourceFile()
         {
-            if (_cts != null) return;
+            if (_cts != null || IsCSharpSection()) return;
             SectionTabs.SelectedItem = SectionFixTab;
             BrowseFileButton_Click(this, new RoutedEventArgs());
         }
@@ -276,7 +310,7 @@ namespace SparrowRunner.Gui
 
         private void OpenSourceFolder()
         {
-            if (_cts != null) return;
+            if (_cts != null || IsCSharpSection()) return;
             SectionTabs.SelectedItem = SectionFixTab;
             BrowseFolderButton_Click(this, new RoutedEventArgs());
         }
@@ -285,7 +319,7 @@ namespace SparrowRunner.Gui
 
         private void ChooseXlsOutputFolder()
         {
-            if (_cts != null) return;
+            if (_cts != null || IsCSharpSection()) return;
             SectionTabs.SelectedItem = SectionXlsTab;
             BrowseTrackCOutputButton_Click(this, new RoutedEventArgs());
         }
@@ -294,7 +328,7 @@ namespace SparrowRunner.Gui
 
         private async Task RegisterSourceFilesAsync()
         {
-            if (_cts != null) return;
+            if (_cts != null || IsCSharpSection()) return;
             SectionTabs.SelectedItem = SectionFixTab;
 
             string target = TargetPathBox.Text.Trim().Trim('"');
@@ -685,16 +719,19 @@ namespace SparrowRunner.Gui
         {
             if (_cts != null) return;
 
-            SectionTabs.SelectedItem = SectionFixTab;
             RulesTabs.SelectedItem = commentLayout ? TrackBTab : TrackATab;
-            IReadOnlyList<RuleSettingOption> options = commentLayout
+            IReadOnlyList<RuleSettingOption> cFamilyOptions = commentLayout
+                ? BuildCFamilyCommentRuleOptions()
+                : BuildCFamilyCodeRuleOptions();
+            IReadOnlyList<RuleSettingOption> csharpOptions = commentLayout
                 ? BuildCommentRuleOptions()
                 : BuildCodeRuleOptions();
             string title = commentLayout ? "주석·레이아웃 설정" : "코드 규칙 설정";
-            var dialog = new RuleSettingsWindow(title, options, _darkTheme) { Owner = this };
+            var dialog = new RuleSettingsWindow(title, cFamilyOptions, csharpOptions, _darkTheme) { Owner = this };
             if (dialog.ShowDialog() != true) return;
 
             IReadOnlyDictionary<string, bool> selections = dialog.Selections;
+            ApplyCFamilyRuleSelections(selections, commentLayout);
             foreach ((CheckBox CheckBox, bool IsDefault) pair in commentLayout ? CommentRuleControls() : CodeRuleControls())
             {
                 if (selections.TryGetValue(pair.CheckBox.Name, out bool selected))
@@ -710,23 +747,151 @@ namespace SparrowRunner.Gui
         private IReadOnlyList<RuleSettingOption> BuildCodeRuleOptions()
         {
             var controls = CodeRuleControls();
-            return controls.Select(pair => new RuleSettingOption(
-                pair.CheckBox.Name,
-                pair.CheckBox.Content?.ToString() ?? pair.CheckBox.Name,
-                pair.IsDefault ? "기본 자동수정" : "선택 자동수정",
-                pair.CheckBox.IsChecked == true,
-                pair.IsDefault)).ToList();
+            return controls.Select(pair => BuildCSharpRuleOption(
+                pair.CheckBox,
+                pair.IsDefault,
+                pair.IsDefault ? "기본 자동수정" : "선택 자동수정")).ToList();
         }
 
         private IReadOnlyList<RuleSettingOption> BuildCommentRuleOptions()
         {
             var controls = CommentRuleControls();
-            return controls.Select(pair => new RuleSettingOption(
-                pair.CheckBox.Name,
-                pair.CheckBox.Content?.ToString() ?? pair.CheckBox.Name,
-                pair.IsDefault ? "기본 주석 규칙" : "선택 레이아웃/주석 규칙",
-                pair.CheckBox.IsChecked == true,
-                pair.IsDefault)).ToList();
+            return controls.Select(pair => BuildCSharpRuleOption(
+                pair.CheckBox,
+                pair.IsDefault,
+                pair.IsDefault ? "기본 주석 규칙" : "선택 레이아웃/주석 규칙")).ToList();
+        }
+
+        private RuleSettingOption BuildCSharpRuleOption(CheckBox checkBox, bool isDefault, string group)
+        {
+            _ruleInfos.TryGetValue(checkBox.Name, out RuleInfo? info);
+            string details = info == null
+                ? "규칙 설명이 준비되지 않았습니다."
+                : info.Summary + Environment.NewLine + info.Checker;
+            return new RuleSettingOption(
+                checkBox.Name,
+                checkBox.Content?.ToString() ?? checkBox.Name,
+                group,
+                checkBox.IsChecked == true,
+                isDefault,
+                details,
+                info?.Before,
+                info?.After);
+        }
+
+        private IReadOnlyList<RuleSettingOption> BuildCFamilyCodeRuleOptions() => new[]
+        {
+            new RuleSettingOption(
+                CFamilyCompoundStatementsKey,
+                "조건문·반복문 중괄호 추가",
+                "기본 자동수정",
+                _cFamilyCompoundStatements,
+                isDefault: true,
+                "기준: MISRA C:2012 Rule 15.6 / CWE-483\n설명: if, else, for, while, do 본문을 중괄호가 있는 복합문으로 만들어 제어 흐름의 오해를 방지합니다.",
+                "if (ready)\n    run();",
+                "if (ready)\n{\n    run();\n}"),
+            new RuleSettingOption(
+                CFamilyFinalElseKey,
+                "else-if 체인의 최종 else 추가",
+                "선택 자동수정",
+                _cFamilyFinalElse,
+                isDefault: false,
+                "기준: MISRA C:2012 Rule 15.7\n설명: if-else if 체인을 최종 else로 끝내 예상하지 못한 조건을 명시적으로 처리합니다. 단독 if문은 별도의 'if-else문에서 else 누락' 규칙에서 처리합니다.",
+                "if (state == READY)\n{\n    start();\n}\nelse if (state == STOPPED)\n{\n    stop();\n}",
+                "if (state == READY)\n{\n    start();\n}\nelse if (state == STOPPED)\n{\n    stop();\n}\nelse\n{\n    asm(\"nop\");\n}"),
+            new RuleSettingOption(
+                CFamilyMissingElseKey,
+                "if-else문에서 else 누락",
+                "선택 자동수정",
+                _cFamilyMissingElse,
+                isDefault: false,
+                "기준: 프로젝트 자체 규칙(MISRA C:2012 및 CWE-658/659 직접 대응 없음)\n설명: else가 없는 단독 if문을 검출하고 else 본문에 asm(\"nop\");을 추가합니다.",
+                "if (ready)\n{\n    run();\n}",
+                "if (ready)\n{\n    run();\n}\nelse\n{\n    asm(\"nop\");\n}"),
+            new RuleSettingOption(
+                CFamilySwitchDefaultKey,
+                "switch 문의 default 추가",
+                "선택 자동수정",
+                _cFamilySwitchDefault,
+                isDefault: false,
+                "기준: MISRA C:2012 Rule 16.4 / CWE-478\n설명: switch 문에 default 레이블을 추가하고 asm(\"nop\");과 break;를 넣어 열거되지 않은 값의 처리 경로를 명확하게 합니다.",
+                "switch (state)\n{\ncase READY:\n    start();\n    break;\n}",
+                "switch (state)\n{\ncase READY:\n    start();\n    break;\ndefault:\n    /* Unexpected state. */\n    asm(\"nop\");\n    break;\n}"),
+            new RuleSettingOption(
+                CFamilyLogicalParenthesesKey,
+                "논리식 괄호 명확화",
+                "기본 자동수정",
+                _cFamilyLogicalParentheses,
+                isDefault: true,
+                "기준: MISRA C:2012 Rule 12.1 / CWE-783\n설명: 서로 다른 논리 연산자가 섞인 식의 평가 순서를 괄호로 명시해 연산자 우선순위 오해를 방지합니다.",
+                "if (ready && valid || forced)\n{\n    run();\n}",
+                "if ((ready && valid) || forced)\n{\n    run();\n}"),
+            new RuleSettingOption(
+                CFamilyUnsignedSuffixKey,
+                "unsigned 정수 상수에 U 접미사 추가",
+                "선택 자동수정",
+                _cFamilyUnsignedSuffix,
+                isDefault: false,
+                "기준: MISRA C:2012 Rule 7.2\n설명: unsigned 타입과 함께 사용하는 정수 상수에 U 접미사를 붙여 상수의 부호를 명확하게 합니다.",
+                "uint32_t mask = 1 << bit;",
+                "uint32_t mask = 1U << bit;"),
+            new RuleSettingOption(
+                CFamilyIgnoredReturnKey,
+                "무시한 반환값을 명시적으로 표시",
+                "선택 자동수정",
+                _cFamilyIgnoredReturn,
+                isDefault: false,
+                "기준: MISRA C:2012 Rule 17.7 / CWE-252\n설명: 반환값을 의도적으로 사용하지 않는 호출은 void 캐스트로 표시하고, 오류 처리가 필요한 호출은 검토 대상으로 구분합니다.",
+                "log_flush();",
+                "(void)log_flush();"),
+            new RuleSettingOption(
+                CFamilySizeOfPointeeKey,
+                "sizeof(pointer)를 sizeof(*pointer)로 보정",
+                "선택 자동수정",
+                _cFamilySizeOfPointee,
+                isDefault: false,
+                "기준: CWE-467 (CWE-658/659 관련)\n설명: 메모리 크기를 계산하는 문맥에서 포인터 자체의 크기 대신 포인터가 가리키는 객체 크기를 사용합니다.",
+                "buffer = malloc(count * sizeof(buffer));",
+                "buffer = malloc(count * sizeof(*buffer));"),
+            new RuleSettingOption(
+                CFamilyFixedWidthTypesKey,
+                "고정폭 정수 typedef 사용",
+                "선택 자동수정",
+                _cFamilyFixedWidthTypes,
+                isDefault: false,
+                "기준: MISRA C:2012 Directive 4.6\n설명: 프로젝트에서 설정한 타입 매핑에 따라 기본 정수형을 크기와 부호가 드러나는 typedef로 바꿉니다. 공개 API와 구조체 필드는 검토 대상입니다.",
+                "unsigned int count;\nint result;",
+                "uint32_t count;\nint32_t result;")
+        };
+
+        private IReadOnlyList<RuleSettingOption> BuildCFamilyCommentRuleOptions() => new[]
+        {
+            new RuleSettingOption(CFamilyTrailingCommentKey, "코드 뒤 주석을 위 줄로 이동", "기본 주석 규칙", _cFamilyTrailingComment, true),
+            new RuleSettingOption(CFamilyCommentSpaceKey, "주석 기호 뒤 공백 추가", "기본 주석 규칙", _cFamilyCommentSpace, true),
+            new RuleSettingOption(CFamilyCommentPeriodKey, "주석 끝 마침표 추가", "기본 주석 규칙", _cFamilyCommentPeriod, true),
+            new RuleSettingOption(CFamilyCommentCapitalizeKey, "주석 첫 영문 대문자화", "기본 주석 규칙", _cFamilyCommentCapitalize, true)
+        };
+
+        private void ApplyCFamilyRuleSelections(IReadOnlyDictionary<string, bool> selections, bool commentLayout)
+        {
+            if (commentLayout)
+            {
+                if (selections.TryGetValue(CFamilyTrailingCommentKey, out bool trailing)) _cFamilyTrailingComment = trailing;
+                if (selections.TryGetValue(CFamilyCommentSpaceKey, out bool space)) _cFamilyCommentSpace = space;
+                if (selections.TryGetValue(CFamilyCommentPeriodKey, out bool period)) _cFamilyCommentPeriod = period;
+                if (selections.TryGetValue(CFamilyCommentCapitalizeKey, out bool capitalize)) _cFamilyCommentCapitalize = capitalize;
+                return;
+            }
+
+            if (selections.TryGetValue(CFamilyCompoundStatementsKey, out bool compound)) _cFamilyCompoundStatements = compound;
+            if (selections.TryGetValue(CFamilyFinalElseKey, out bool finalElse)) _cFamilyFinalElse = finalElse;
+            if (selections.TryGetValue(CFamilyMissingElseKey, out bool missingElse)) _cFamilyMissingElse = missingElse;
+            if (selections.TryGetValue(CFamilySwitchDefaultKey, out bool switchDefault)) _cFamilySwitchDefault = switchDefault;
+            if (selections.TryGetValue(CFamilyLogicalParenthesesKey, out bool parentheses)) _cFamilyLogicalParentheses = parentheses;
+            if (selections.TryGetValue(CFamilyUnsignedSuffixKey, out bool unsignedSuffix)) _cFamilyUnsignedSuffix = unsignedSuffix;
+            if (selections.TryGetValue(CFamilyIgnoredReturnKey, out bool ignoredReturn)) _cFamilyIgnoredReturn = ignoredReturn;
+            if (selections.TryGetValue(CFamilySizeOfPointeeKey, out bool sizeOfPointee)) _cFamilySizeOfPointee = sizeOfPointee;
+            if (selections.TryGetValue(CFamilyFixedWidthTypesKey, out bool fixedWidthTypes)) _cFamilyFixedWidthTypes = fixedWidthTypes;
         }
 
         private List<(CheckBox CheckBox, bool IsDefault)> CodeRuleControls() => new List<(CheckBox, bool)>
@@ -758,7 +923,10 @@ namespace SparrowRunner.Gui
             => StopButton_Click(sender, e);
 
         private void OpenXlsOutputMenuItem_Click(object sender, RoutedEventArgs e)
-            => OpenTrackCOutputButton_Click(sender, e);
+        {
+            if (IsCSharpSection()) return;
+            OpenTrackCOutputButton_Click(sender, e);
+        }
 
         private void RunCommentLayoutMenuItem_Click(object sender, RoutedEventArgs e)
             => RunCommentLayoutFromMenu();
@@ -770,7 +938,7 @@ namespace SparrowRunner.Gui
         {
             if (_cts != null) return;
             _activeTaskName = "코드 규칙 수정";
-            SectionTabs.SelectedItem = SectionFixTab;
+            if (IsXlsSection()) SectionTabs.SelectedItem = SectionFixTab;
             RulesTabs.SelectedItem = TrackATab;
             RunButton_Click(this, new RoutedEventArgs());
         }
@@ -779,7 +947,7 @@ namespace SparrowRunner.Gui
         {
             if (_cts != null) return;
             _activeTaskName = "주석·레이아웃 수정";
-            SectionTabs.SelectedItem = SectionFixTab;
+            if (IsXlsSection()) SectionTabs.SelectedItem = SectionFixTab;
             RulesTabs.SelectedItem = TrackBTab;
             RunButton_Click(this, new RoutedEventArgs());
         }
@@ -789,7 +957,7 @@ namespace SparrowRunner.Gui
 
         private void OpenTargetFolderFromMenu()
         {
-            if (_cts != null) return;
+            if (_cts != null || IsCSharpSection()) return;
             SectionTabs.SelectedItem = SectionFixTab;
             OpenTargetButton_Click(this, new RoutedEventArgs());
         }
@@ -985,6 +1153,8 @@ namespace SparrowRunner.Gui
 
         // XLS 분리 대분류가 선택되어 있나(= Track C 화면).
         private bool IsXlsSection() => ReferenceEquals(SectionTabs.SelectedItem, SectionXlsTab);
+        private bool IsCFamilySection() => ReferenceEquals(SectionTabs.SelectedItem, SectionFixTab);
+        private bool IsCSharpSection() => ReferenceEquals(SectionTabs.SelectedItem, SectionCSharpTab);
 
         private ActiveTrack CurrentTrack()
         {
@@ -1025,12 +1195,12 @@ namespace SparrowRunner.Gui
             switch (track)
             {
                 case ActiveTrack.A:
-                    RunButton.Content = "코드 규칙 수정 실행";
+                    RunButton.Content = IsCSharpSection() ? "C# 코드 규칙 수정 실행" : "C/C++ 코드 규칙 수정 실행";
                     RunButton.ToolTip = ModeNotice;
                     RunButton.IsEnabled = _cts == null;
                     break;
                 case ActiveTrack.B:
-                    RunButton.Content = "주석·레이아웃 수정 실행";
+                    RunButton.Content = IsCSharpSection() ? "C# 주석·레이아웃 수정 실행" : "C/C++ 주석·레이아웃 수정 실행";
                     RunButton.ToolTip = ModeNotice;
                     RunButton.IsEnabled = _cts == null;
                     break;
@@ -1046,6 +1216,8 @@ namespace SparrowRunner.Gui
                     RunButton.IsEnabled = false;
                     break;
             }
+
+            UpdateFileMenuAvailability();
         }
 
         // 대분류 전환: 화면이 통째로 바뀌므로 실행 버튼/안내/요약을 그 대분류 기준으로 다시 맞춘다.
@@ -1065,6 +1237,20 @@ namespace SparrowRunner.Gui
                 }
             }
             UpdateSummary();
+        }
+
+        private void UpdateFileMenuAvailability()
+        {
+            bool enabled = _cts == null && !IsCSharpSection();
+            OpenFileMenuItem.IsEnabled = enabled;
+            OpenFolderMenuItem.IsEnabled = enabled;
+            ChooseOutputFolderMenuItem.IsEnabled = enabled;
+            RegisterSourceMenuItem.IsEnabled = enabled;
+            OpenTargetFolderMenuItem.IsEnabled = enabled && !IsXlsSection();
+            OpenXlsOutputMenuItem.IsEnabled = enabled && Directory.Exists(_lastTrackCOutputDir ?? "");
+            FileMenu.ToolTip = IsCSharpSection()
+                ? "코드 자동수정 (C#) 탭에서는 종료만 사용할 수 있습니다."
+                : null;
         }
 
         private void RulesTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1164,7 +1350,7 @@ namespace SparrowRunner.Gui
             bool runTrackA = track == ActiveTrack.A;
             bool runTrackB = track == ActiveTrack.B;
 
-            string target = TargetPathBox.Text.Trim().Trim('"');
+            string target = (IsCSharpSection() ? CSharpTargetPathBox.Text : TargetPathBox.Text).Trim().Trim('"');
             if (string.IsNullOrEmpty(target) || (!File.Exists(target) && !Directory.Exists(target)))
             {
                 MessageBox.Show(this, "대상 .sln/.csproj 또는 소스 폴더를 먼저 선택하세요.", "입력 확인",
@@ -1172,17 +1358,40 @@ namespace SparrowRunner.Gui
                 return;
             }
 
-            SourceScope scope = await EnsureScopeAsync(target);
+            SourceScope scope = IsCSharpSection()
+                ? await EnsureCSharpScopeAsync(target)
+                : await EnsureScopeAsync(target);
             IReadOnlyList<string> selectedFiles = scope.SelectedFiles;
             if (selectedFiles.Count == 0)
             {
-                MessageBox.Show(this, "선택된 소스 파일이 없습니다. 파일 > 소스 파일 등록에서 작업 파일을 선택하세요.", "범위 확인",
+                string message = IsCSharpSection()
+                    ? "선택된 C# 소스 파일이 없습니다. 왼쪽 작업 범위에서 파일을 선택하세요."
+                    : "선택된 소스 파일이 없습니다. 파일 > 소스 파일 등록에서 작업 파일을 선택하세요.";
+                MessageBox.Show(this, message, "범위 확인",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            string[] csharpFiles = selectedFiles.Where(p => p.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)).ToArray();
-            string[] cFamilyFiles = selectedFiles.Where(IsCFamilyFile).ToArray();
+            // 상단 언어 탭이 실행 범위를 결정한다. 같은 프로젝트 범위를 공유하더라도
+            // C/C++ 탭에서는 C 계열만, C# 탭에서는 .cs 파일만 러너에 전달한다.
+            string[] csharpFiles = IsCSharpSection()
+                ? selectedFiles.Where(p => p.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)).ToArray()
+                : Array.Empty<string>();
+            string[] cFamilyFiles = IsCFamilySection()
+                ? selectedFiles.Where(IsCFamilyFile).ToArray()
+                : Array.Empty<string>();
+            if (IsCFamilySection() && cFamilyFiles.Length == 0)
+            {
+                MessageBox.Show(this, "선택된 C/C++ 소스 파일이 없습니다. 지원 형식: .c, .cpp, .h, .hpp",
+                    "실행 범위 확인", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (IsCSharpSection() && csharpFiles.Length == 0)
+            {
+                MessageBox.Show(this, "선택된 C# 소스 파일이 없습니다. 왼쪽 작업 범위에서 파일을 선택하세요.",
+                    "실행 범위 확인", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             string? scopeManifest = null;
             if (csharpFiles.Length > 0)
             {
@@ -1204,15 +1413,25 @@ namespace SparrowRunner.Gui
             var cOptions = new CFamilyBasicFixer.Options
             {
                 // C에는 var가 없고 C++의 auto도 의미가 달라 기본 var 3종은 적용하지 않는다.
-                // 공통으로 의미 보존이 가능한 기본 코드 규칙만 실행한다.
-                LogicalParentheses = runTrackA && ASParens.IsChecked == true,
-                TrailingComment = runTrackB && BTrailing.IsChecked == true,
-                CommentSpace = runTrackB && BSpace.IsChecked == true,
-                CommentPeriod = runTrackB && BPeriod.IsChecked == true,
-                CommentCapitalize = runTrackB && BCapitalize.IsChecked == true,
+                // C/C++ 탭에서 선택한 코드 규칙과 주석 규칙을 서로 독립적으로 실행한다.
+                CompoundStatements = runTrackA && _cFamilyCompoundStatements,
+                FinalElse = runTrackA && _cFamilyFinalElse,
+                MissingElse = runTrackA && _cFamilyMissingElse,
+                SwitchDefault = runTrackA && _cFamilySwitchDefault,
+                LogicalParentheses = runTrackA && _cFamilyLogicalParentheses,
+                UnsignedSuffix = runTrackA && _cFamilyUnsignedSuffix,
+                IgnoredReturn = runTrackA && _cFamilyIgnoredReturn,
+                SizeOfPointee = runTrackA && _cFamilySizeOfPointee,
+                FixedWidthTypes = runTrackA && _cFamilyFixedWidthTypes,
+                TrailingComment = runTrackB && _cFamilyTrailingComment,
+                CommentSpace = runTrackB && _cFamilyCommentSpace,
+                CommentPeriod = runTrackB && _cFamilyCommentPeriod,
+                CommentCapitalize = runTrackB && _cFamilyCommentCapitalize,
             };
             bool hasCFamilyWork = cFamilyFiles.Length > 0 &&
-                (cOptions.LogicalParentheses || cOptions.TrailingComment || cOptions.CommentSpace ||
+                (cOptions.CompoundStatements || cOptions.FinalElse || cOptions.MissingElse || cOptions.SwitchDefault ||
+                 cOptions.LogicalParentheses || cOptions.UnsignedSuffix || cOptions.IgnoredReturn ||
+                 cOptions.SizeOfPointee || cOptions.FixedWidthTypes || cOptions.TrailingComment || cOptions.CommentSpace ||
                  cOptions.CommentPeriod || cOptions.CommentCapitalize);
             if (jobs.Count == 0 && !hasCFamilyWork)
             {
@@ -1245,20 +1464,24 @@ namespace SparrowRunner.Gui
                     AppendLog("C/C++ 출력 안내: 별도 결과 파일을 만들지 않고 선택한 원본 소스 파일을 직접 수정합니다.");
                     AppendLog("C/C++ 적용 규칙: " + string.Join(", ", new[]
                     {
+                        cOptions.CompoundStatements ? "조건문·반복문 중괄호" : null,
+                        cOptions.FinalElse ? "최종 else" : null,
+                        cOptions.MissingElse ? "단독 if의 else 누락" : null,
+                        cOptions.SwitchDefault ? "switch default" : null,
                         cOptions.LogicalParentheses ? "논리식 괄호" : null,
+                        cOptions.UnsignedSuffix ? "unsigned 상수 U 접미사" : null,
+                        cOptions.IgnoredReturn ? "반환값 무시 표시" : null,
+                        cOptions.SizeOfPointee ? "sizeof 포인터 보정" : null,
+                        cOptions.FixedWidthTypes ? "고정폭 정수 타입" : null,
                         cOptions.TrailingComment ? "뒤 주석 이동" : null,
                         cOptions.CommentSpace ? "주석 공백" : null,
                         cOptions.CommentPeriod ? "주석 마침표" : null,
                         cOptions.CommentCapitalize ? "주석 첫 영문 대문자" : null,
                     }.OfType<string>()));
                     int changed = await Task.Run(() => CFamilyBasicFixer.Apply(cFamilyFiles, cOptions, _cts.Token, AppendLog));
-                    AppendLog("C/C++ 기본 규칙 완료: " + changed + "개 파일 변경");
+                    AppendLog("C/C++ 선택 규칙 완료: " + changed + "개 파일 변경");
                     if (changed == 0)
                         AppendLog("C/C++ 안내: 선택한 규칙과 일치하는 코드 또는 주석이 없거나 이미 규칙에 맞게 작성되어 있습니다.");
-                    if (runTrackA && (ASObjectVarSafe.IsChecked == true || ASObviousVar.IsChecked == true || ASArrayVarSafe.IsChecked == true))
-                    {
-                        AppendLog("C/C++ 안내: var 변환 3종은 C 문법에 없거나 C++ 의미가 달라 안전을 위해 건너뜁니다.");
-                    }
                 }
                 foreach (RunnerJob job in jobs)
                 {
@@ -1446,6 +1669,7 @@ namespace SparrowRunner.Gui
 
         private void OpenTargetButton_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCSharpSection()) return;
             string target = TargetPathBox.Text.Trim().Trim('"');
             string? dir = null;
             if (Directory.Exists(target)) dir = target;
@@ -1463,6 +1687,7 @@ namespace SparrowRunner.Gui
 
         private void OpenTrackCOutputButton_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCSharpSection()) return;
             if (string.IsNullOrEmpty(_lastTrackCOutputDir) || !Directory.Exists(_lastTrackCOutputDir))
             {
                 MessageBox.Show(this, "열 수 있는 Track C 출력 폴더가 없습니다.", "안내",
@@ -1482,6 +1707,61 @@ namespace SparrowRunner.Gui
         {
             UpdateSummary();
             _ = RefreshScopeAsync(showErrors: false);
+        }
+
+        private void CSharpTargetPathBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateSummary();
+            _ = RefreshCSharpScopeAsync(showErrors: false);
+        }
+
+        private void CSharpBrowseFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cts != null) return;
+            var dialog = new OpenFileDialog
+            {
+                Title = "C# 솔루션 또는 프로젝트 선택",
+                Filter = "Solution/Project (*.sln;*.csproj)|*.sln;*.csproj|모든 파일 (*.*)|*.*",
+                CheckFileExists = true
+            };
+            string current = CSharpTargetPathBox.Text.Trim().Trim('"');
+            if (File.Exists(current)) dialog.InitialDirectory = Path.GetDirectoryName(current);
+            else if (Directory.Exists(current)) dialog.InitialDirectory = current;
+            if (dialog.ShowDialog(this) == true) CSharpTargetPathBox.Text = dialog.FileName;
+        }
+
+        private void CSharpBrowseFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cts != null) return;
+            var dialog = new OpenFolderDialog { Title = "C# 소스 폴더 선택" };
+            string current = CSharpTargetPathBox.Text.Trim().Trim('"');
+            if (Directory.Exists(current)) dialog.InitialDirectory = current;
+            else if (File.Exists(current)) dialog.InitialDirectory = Path.GetDirectoryName(current);
+            if (dialog.ShowDialog(this) == true) CSharpTargetPathBox.Text = dialog.FolderName;
+        }
+
+        private async void CSharpRefreshScopeButton_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshCSharpScopeAsync(showErrors: true);
+        }
+
+        private void CSharpSelectAllScopeButton_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (SourceScopeNode root in CSharpScopeRoots) root.SetSubtree(true);
+            UpdateSummary();
+        }
+
+        private void CSharpClearScopeButton_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (SourceScopeNode root in CSharpScopeRoots) root.SetSubtree(false);
+            UpdateSummary();
+        }
+
+        private async void CSharpScopeTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (!(e.NewValue is SourceScopeNode node) || !node.IsFile) return;
+            CSharpSourcePathText.Text = node.FullPath;
+            await LoadSourceTextAsync(node.FullPath, CSharpSourceCodeViewer, primaryGeneration: null);
         }
 
         // XLS 경로가 설정되는 순간(찾아보기 선택 OR 시작 인자 --trackc-xls 프리필) 실행(export) 없이 체커와 검출
@@ -1695,6 +1975,88 @@ namespace SparrowRunner.Gui
             _currentScope = scope;
             ScopeRoots.Clear();
             ScopeRoots.Add(scope.RootNode);
+            UpdateSummary();
+            return scope;
+        }
+
+        private async Task RefreshCSharpScopeAsync(bool showErrors)
+        {
+            if (!IsLoaded && !showErrors) return;
+
+            string target = CSharpTargetPathBox.Text.Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(target) || (!File.Exists(target) && !Directory.Exists(target)))
+            {
+                _currentCSharpScope = null;
+                CSharpScopeRoots.Clear();
+                CSharpScopeStatusText.Text = "대상 경로를 선택하세요.";
+                UpdateSummary();
+                return;
+            }
+
+            _csharpScopeCts?.Cancel();
+            _csharpScopeCts?.Dispose();
+            _csharpScopeCts = new CancellationTokenSource();
+            CancellationToken token = _csharpScopeCts.Token;
+
+            try
+            {
+                CSharpScopeStatusText.Text = "C# 소스 파일을 탐색하는 중...";
+                SourceScope? previousScope = _currentCSharpScope;
+                HashSet<string>? previousSelection = null;
+                HashSet<string>? previousExpandedPaths = null;
+                string expectedRoot = ResolveTargetRoot(target);
+                if (previousScope != null && SamePath(previousScope.RootPath, expectedRoot))
+                {
+                    previousExpandedPaths = CaptureExpandedPaths(previousScope.RootNode);
+                    int previousSelectable = previousScope.RootNode.EnumerateFiles()
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Count();
+                    IReadOnlyList<string> selected = previousScope.SelectedFiles;
+                    if (selected.Count < previousSelectable)
+                    {
+                        previousSelection = new HashSet<string>(selected, StringComparer.OrdinalIgnoreCase);
+                    }
+                }
+
+                SourceScope scope = await SourceScopeDiscovery.DiscoverCSharpAsync(
+                    target, IncludeGeneratedFiles, token);
+                if (token.IsCancellationRequested) return;
+                if (previousSelection != null) scope.RootNode.ApplySelection(previousSelection);
+                if (previousExpandedPaths != null) RestoreExpandedPaths(scope.RootNode, previousExpandedPaths);
+
+                _currentCSharpScope = scope;
+                CSharpScopeRoots.Clear();
+                CSharpScopeRoots.Add(scope.RootNode);
+                UpdateSummary();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _currentCSharpScope = null;
+                CSharpScopeRoots.Clear();
+                CSharpScopeStatusText.Text = "범위 탐색 실패: " + ex.Message;
+                if (showErrors)
+                {
+                    MessageBox.Show(this, ex.Message, "C# 범위 탐색 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        private async Task<SourceScope> EnsureCSharpScopeAsync(string target)
+        {
+            string expectedRoot = ResolveTargetRoot(target);
+            if (_currentCSharpScope != null && SamePath(_currentCSharpScope.RootPath, expectedRoot))
+            {
+                return _currentCSharpScope;
+            }
+
+            SourceScope scope = await SourceScopeDiscovery.DiscoverCSharpAsync(
+                target, IncludeGeneratedFiles, CancellationToken.None);
+            _currentCSharpScope = scope;
+            CSharpScopeRoots.Clear();
+            CSharpScopeRoots.Add(scope.RootNode);
             UpdateSummary();
             return scope;
         }
@@ -2273,17 +2635,20 @@ namespace SparrowRunner.Gui
 
             ActiveTrack track = CurrentTrack();
             UpdateXlsScopeSummary();
-            int selectedFiles = _currentScope?.SelectedFiles.Count ?? 0;
-            int totalFiles = _currentScope?.TotalFiles ?? 0;
-            int excludedFiles = _currentScope?.ExcludedFiles ?? 0;
+            SourceScope? activeLocalScope = IsCSharpSection() ? _currentCSharpScope : _currentScope;
+            int selectedFiles = activeLocalScope?.SelectedFiles.Count ?? 0;
+            int totalFiles = activeLocalScope?.TotalFiles ?? 0;
+            int excludedFiles = activeLocalScope?.ExcludedFiles ?? 0;
 
-            if (_currentScope != null)
+            if (activeLocalScope != null)
             {
-                ScopeStatusText.Text = $"{selectedFiles}개 선택 / {totalFiles}개 발견"
+                string status = $"{selectedFiles}개 선택 / {totalFiles}개 발견"
                     + (excludedFiles > 0 ? $" / {excludedFiles}개 제외" : "");
+                if (IsCSharpSection()) CSharpScopeStatusText.Text = status;
+                else ScopeStatusText.Text = status;
             }
 
-            string target = TargetPathBox.Text.Trim();
+            string target = (IsCSharpSection() ? CSharpTargetPathBox.Text : TargetPathBox.Text).Trim();
             SummaryTargetText.Text = string.IsNullOrEmpty(target)
                 ? "대상 경로가 필요합니다."
                 : target;
@@ -2292,22 +2657,49 @@ namespace SparrowRunner.Gui
             {
                 case ActiveTrack.A:
                 {
-                    int count = CountChecked(ASObjectVarSafe, ASObviousVar, ASArrayVarSafe, ASParens, ASForeachCast,
+                    int csharpCount = CountChecked(ASObjectVarSafe, ASObviousVar, ASArrayVarSafe, ASParens, ASForeachCast,
                         ASObjectInitializer, ASNullVar, ASObjectVarNarrowing, ASLocalConst, ASArrayVarNarrowing,
                         ASForVar, ASFieldSplit, ASEmptyStmt, ASForHoist);
+                    int cFamilyCount = new[]
+                    {
+                        _cFamilyCompoundStatements,
+                        _cFamilyFinalElse,
+                        _cFamilyMissingElse,
+                        _cFamilySwitchDefault,
+                        _cFamilyLogicalParentheses,
+                        _cFamilyUnsignedSuffix,
+                        _cFamilyIgnoredReturn,
+                        _cFamilySizeOfPointee,
+                        _cFamilyFixedWidthTypes
+                    }.Count(selected => selected);
                     int review = CountChecked(ASForeachCast, ASNullVar, ASObjectVarNarrowing, ASLocalConst,
                         ASArrayVarNarrowing, ASForHoist);
-                    SummaryRulesText.Text = $"코드 규칙 · 선택 {count}개";
-                    SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
+                    SummaryRulesText.Text = IsCSharpSection()
+                        ? $"C# 코드 규칙 · 선택 {csharpCount}개"
+                        : $"C/C++ 코드 규칙 · 선택 {cFamilyCount}개";
+                    SummaryModeText.Text = IsCSharpSection()
+                        ? $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}"
+                        : $"{ModeNotice} · 선택 파일 {selectedFiles}";
                     break;
                 }
                 case ActiveTrack.B:
                 {
-                    int count = CountChecked(BTrailing, BSpace, BPeriod, BCapitalize, BFlatten, BMemberBlank,
+                    int csharpCount = CountChecked(BTrailing, BSpace, BPeriod, BCapitalize, BFlatten, BMemberBlank,
                         BOneDeclaration, BOneStatement, BContinuation, BLinqAlign, BBlockPromote);
+                    int cFamilyCount = new[]
+                    {
+                        _cFamilyTrailingComment,
+                        _cFamilyCommentSpace,
+                        _cFamilyCommentPeriod,
+                        _cFamilyCommentCapitalize
+                    }.Count(selected => selected);
                     int review = CountChecked(BBlockPromote);
-                    SummaryRulesText.Text = $"주석·레이아웃 · 선택 {count}개";
-                    SummaryModeText.Text = $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}";
+                    SummaryRulesText.Text = IsCSharpSection()
+                        ? $"C# 주석·레이아웃 · 선택 {csharpCount}개"
+                        : $"C/C++ 주석·레이아웃 · 선택 {cFamilyCount}개";
+                    SummaryModeText.Text = IsCSharpSection()
+                        ? $"{ModeNotice} · 검토필요 {review} · 선택 파일 {selectedFiles}"
+                        : $"{ModeNotice} · 선택 파일 {selectedFiles}";
                     break;
                 }
                 case ActiveTrack.C:
@@ -2385,6 +2777,13 @@ namespace SparrowRunner.Gui
             SelectAllScopeButton.IsEnabled = !running;
             ClearScopeButton.IsEnabled = !running;
             ScopeTree.IsEnabled = !running;
+            CSharpBrowseFileButton.IsEnabled = !running;
+            CSharpBrowseFolderButton.IsEnabled = !running;
+            CSharpRefreshScopeButton.IsEnabled = !running;
+            CSharpSelectAllScopeButton.IsEnabled = !running;
+            CSharpClearScopeButton.IsEnabled = !running;
+            CSharpScopeTree.IsEnabled = !running;
+            CSharpTargetPathBox.IsEnabled = !running;
             BrowseTrackCXlsButton.IsEnabled = !running;
             BrowseTrackCOutputButton.IsEnabled = !running;
             SelectAllXlsScopeButton.IsEnabled = !running;
@@ -2417,6 +2816,7 @@ namespace SparrowRunner.Gui
                 ActiveTaskStatusText.Text = completed ? _activeTaskName + " 완료" : _activeTaskName;
                 _activeTaskName = "준비됨";
             }
+            UpdateFileMenuAvailability();
         }
 
         // 미처리 예외를 세션 로그에만 남긴다. 예외를 처리(Handled)하지 않으므로 앱 동작은 지금과 동일하고,

@@ -387,20 +387,20 @@
         <!-- 제목 표시줄 아래의 표준 메뉴 줄. -->
         <Grid DockPanel.Dock="Top" Height="30" Background="{DynamicResource TitleBarBrush}">
         <Menu Background="Transparent" FontSize="13" AutomationProperties.AutomationId="MainMenu">
-            <MenuItem Header="파일(_F)" AutomationProperties.AutomationId="FileMenu">
-                <MenuItem Header="파일 열기(_I)" InputGestureText="Ctrl+Alt+F"
+            <MenuItem x:Name="FileMenu" Header="파일(_F)" AutomationProperties.AutomationId="FileMenu">
+                <MenuItem x:Name="OpenFileMenuItem" Header="파일 열기(_I)" InputGestureText="Ctrl+Alt+F"
                           ToolTip="코드 자동수정 대상 소스 파일, 솔루션 또는 프로젝트를 선택합니다."
                           AutomationProperties.AutomationId="OpenFileMenuItem"
                           Click="OpenFileMenuItem_Click"/>
-                <MenuItem Header="폴더 열기(_O)" InputGestureText="Ctrl+O"
+                <MenuItem x:Name="OpenFolderMenuItem" Header="폴더 열기(_O)" InputGestureText="Ctrl+O"
                           ToolTip="코드 자동수정 대상 소스 폴더를 선택합니다."
                           AutomationProperties.AutomationId="OpenFolderMenuItem"
                           Click="OpenFolderMenuItem_Click"/>
-                <MenuItem Header="출력 폴더(_D)" InputGestureText="Ctrl+Shift+O"
+                <MenuItem x:Name="ChooseOutputFolderMenuItem" Header="출력 폴더(_D)" InputGestureText="Ctrl+Shift+O"
                           ToolTip="XLS 분리 결과를 저장할 폴더를 선택합니다."
                           AutomationProperties.AutomationId="ChooseOutputFolderMenuItem"
                           Click="ChooseOutputFolderMenuItem_Click"/>
-                <MenuItem Header="소스 파일 등록(_S)" InputGestureText="Ctrl+Shift+S"
+                <MenuItem x:Name="RegisterSourceMenuItem" Header="소스 파일 등록(_S)" InputGestureText="Ctrl+Shift+S"
                           ToolTip="코드 자동수정 대상 솔루션 또는 프로젝트를 등록합니다."
                           AutomationProperties.AutomationId="RegisterSourceMenuItem"
                           Click="RegisterSourceMenuItem_Click"/>
@@ -475,8 +475,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ===================== 대분류 2개 ===================== -->
-        <!-- A. 코드 자동수정(내부 Track A/B) : C# 전용 · 소스 파일을 고친다(파괴적). 커밋은 하지 않는다 —
+        <!-- ===================== 대분류 3개 ===================== -->
+        <!-- A. 코드 자동수정(내부 Track A/B) : C/C++와 C#을 상단 탭으로 구분해 소스 파일을 고친다. 커밋은 하지 않는다 —
                 러너에 항상 -NoCommit 을 넘기고, 검토·커밋은 사용자가 git 으로 한다.
              B. XLS 분리(내부 Track C)       : 언어 무관 · 프로젝트 경로 불필요 · 읽기전용.
              둘은 입력도 위험도도 다르므로 같은 화면에 섞지 않는다.
@@ -485,9 +485,9 @@
                     Grid.Row="0" BorderThickness="0" Background="Transparent"
                     SelectionChanged="SectionTabs_SelectionChanged">
 
-            <!-- ===================== A. 코드 자동수정 (C# 전용) ===================== -->
+            <!-- ===================== A. 코드 자동수정 (C/C++) ===================== -->
             <TabItem x:Name="SectionFixTab" AutomationProperties.AutomationId="SectionFixTab"
-                     Style="{StaticResource SectionTabItem}" Header="코드 자동수정 (C#)">
+                     Style="{StaticResource SectionTabItem}" Header="코드 자동수정 (C/C++)">
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -924,6 +924,122 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem x:Name="SectionCSharpTab" AutomationProperties.AutomationId="SectionCSharpTab"
+                     Style="{StaticResource SectionTabItem}" Header="코드 자동수정 (C#)">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 기존 C# 소스 선택 기능. 파일 메뉴와 연결하지 않고 이 탭 안의 버튼으로만 변경한다. -->
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="대상(.sln/.csproj/폴더)" VerticalAlignment="Center"
+                                   Margin="0,0,10,0" Style="{StaticResource MutedText}"/>
+                        <TextBox x:Name="CSharpTargetPathBox" AutomationProperties.AutomationId="CSharpTargetPathBox"
+                                 Grid.Column="1" Style="{StaticResource InputBox}"
+                                 TextChanged="CSharpTargetPathBox_TextChanged" VerticalAlignment="Center"/>
+                        <Button x:Name="CSharpBrowseFileButton" Grid.Column="2" Content="파일 선택" Margin="8,0,0,0"
+                                AutomationProperties.AutomationId="CSharpBrowseFileButton"
+                                Click="CSharpBrowseFileButton_Click"/>
+                        <Button x:Name="CSharpBrowseFolderButton" Grid.Column="3" Content="폴더 선택" Margin="8,0,0,0"
+                                AutomationProperties.AutomationId="CSharpBrowseFolderButton"
+                                Click="CSharpBrowseFolderButton_Click"/>
+                        <Button x:Name="CSharpRefreshScopeButton" Grid.Column="4" Content="새로고침" Margin="8,0,0,0"
+                                AutomationProperties.AutomationId="CSharpRefreshScopeButton"
+                                Click="CSharpRefreshScopeButton_Click"/>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="310"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Background="{DynamicResource PanelBrush}"
+                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="0" Padding="12">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="작업 범위 (로컬 소스)" Style="{StaticResource SectionTitle}"/>
+                                        <TextBlock x:Name="CSharpScopeStatusText"
+                                                   AutomationProperties.AutomationId="CSharpScopeStatusText"
+                                                   Text="대상 경로를 선택하세요." Style="{StaticResource MutedText}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button x:Name="CSharpSelectAllScopeButton" Grid.Column="1" Content="전체" MinWidth="58"
+                                            Margin="8,0,0,0" Click="CSharpSelectAllScopeButton_Click"/>
+                                    <Button x:Name="CSharpClearScopeButton" Grid.Column="2" Content="해제" MinWidth="58"
+                                            Margin="6,0,0,0" Click="CSharpClearScopeButton_Click"/>
+                                </Grid>
+                                <TextBlock Grid.Row="1" Text="bin/obj/.git/.vs/packages 및 생성 파일은 기본 제외됩니다."
+                                           Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,10,0,8"/>
+                                <TreeView x:Name="CSharpScopeTree" AutomationProperties.AutomationId="CSharpScopeTree"
+                                          Grid.Row="2"
+                                          ItemsSource="{Binding CSharpScopeRoots, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          ItemTemplate="{StaticResource SelectableScopeTemplate}"
+                                          ItemContainerStyle="{StaticResource ScopeTreeItemStyle}"
+                                          SelectedItemChanged="CSharpScopeTree_SelectedItemChanged"
+                                          BorderThickness="0" Background="Transparent"
+                                          VirtualizingStackPanel.IsVirtualizing="False"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2" Background="{DynamicResource PanelBrush}"
+                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="42"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Grid Background="{DynamicResource TitleBarBrush}" Margin="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="C# 소스 코드 보기" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" Margin="12,0,10,0"/>
+                                    <TextBlock x:Name="CSharpSourcePathText" Grid.Column="1"
+                                               Text="작업 범위에서 파일을 선택하세요."
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                                </Grid>
+                                <TextBox x:Name="CSharpSourceCodeViewer" Grid.Row="1"
+                                         IsReadOnly="True" IsUndoEnabled="False" AcceptsReturn="True" AcceptsTab="True"
+                                         TextWrapping="NoWrap" FontFamily="Consolas" FontSize="13"
+                                         Background="{DynamicResource CodeSurfaceBrush}" Foreground="{DynamicResource CodeTextBrush}"
+                                         CaretBrush="{DynamicResource CodeTextBrush}" SelectionBrush="{DynamicResource CodeSelectionBrush}"
+                                         BorderThickness="0" Padding="12,10"
+                                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                         Text="작업 범위에서 C# 파일을 선택하면 읽기 전용으로 표시합니다."/>
+                            </Grid>
                         </Border>
                     </Grid>
                 </Grid>
