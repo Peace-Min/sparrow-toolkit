@@ -1,4 +1,10 @@
-﻿# Track A Roslyn 蹂닿컯 ?뺤콉 ??Sparrow 肄붾뱶 洹쒖튃 CLI
+﻿# Track A Roslyn 보강 정책 — Sparrow 코드 규칙 CLI
+
+> **문서 성격**: 이것은 **작성 시점(2026-07)의 설계 기록**이다. "현재 2개 규칙만 구현되어 있다" 같은
+> 현황 서술은 이미 낡았다 — 지금은 규칙 키가 14개다. 이 문서의 가치는 현황이 아니라
+> **규칙별 변환 계약·안전 조건·skip 조건·커밋명 규약·fixture 필수 케이스**에 있다.
+> 현행 규칙 목록과 계약은 [엔진 README](../tools/_internal/SparrowSyntaxFix/README.md) 를,
+> 새 규칙을 추가하는 절차는 [docs/extending.md](../docs/extending.md) 를 본다.
 
 ## Track A Roslyn 원샷 CLI 운영 원칙
 
@@ -8,44 +14,45 @@
 - `foreachcast`, `objectinitializer`, `nullvar`, `objectvar-narrowing`, `localconst`, `arrayvar-narrowing`은 runner가 포함 여부를 묻는다.
 - `-Rules`는 테스트, 자동화, 특정 규칙 재실행용 예외 경로다.
 - 위험 규칙 커밋은 `검토필요`가 드러나도록 분리한다.
-??臾몄꽌??`issues_sample_6869.xls` ?щ텇??寃곌낵瑜?湲곗??쇰줈, Track A???ㅼ쓬 援ы쁽 踰붿쐞瑜??뺤젙???ㅺ퀎?덉씠??
-?듭떖 寃곕줎? ?⑥닚?섎떎. **?ㅼ틪 ?쒖쇅 ?ㅼ젙? ?꾩닚?꾩씠怨? ?곗꽑 `SparrowSyntaxFix`媛 Sparrow??肄붾뱶 洹쒖튃 寃異쒖쓣 ?ㅼ젣濡?以꾩씠?꾨줉 Roslyn 洹쒖튃???뺤옣?쒕떎.**
 
-## ?꾩옱 ?곹깭
+이 문서는 `issues_sample_6869.xls` 재분석 결과를 기준으로, Track A의 다음 구현 범위를 확정한 설계안이다.
+핵심 결론은 단순하다. **스캔 제외 설정은 후순위이고, 우선 `SparrowSyntaxFix`가 Sparrow의 코드 규칙 검출을 실제로 줄이도록 Roslyn 규칙을 확장한다.**
 
-?꾩옱 `SparrowSyntaxFix`??2媛?洹쒖튃留?援ы쁽?섏뼱 ?덈떎.
+## 현재 상태 (작성 시점)
 
-| 洹쒖튃 | 泥섎━ |
+작성 시점의 `SparrowSyntaxFix`에는 2개 규칙만 구현되어 있었다.
+
+| 규칙 | 처리 |
 |---|---|
-| `nullcast` | `Foo x = null;` ??`var x = (Foo)null;` |
-| `parens` | `&&` / `||` ?쇱뿰?곗옄 愿꾪샇 蹂닿컯 |
+| `nullcast` | `Foo x = null;` → `var x = (Foo)null;` |
+| `parens` | `&&` / `||` 피연산자 괄호 보강 |
 
-?곕씪??`Track A ?꾨즺`?쇰뒗 ?쒗쁽? 遺?뺥솗?섎떎. ???뺥솗???곹깭??**Track A ?쇰? ?꾨즺**?? 愿꾪샇? null initializer
-?붿뿬??泥섎━?덉?留? ?붿떆?????怨꾩뿴 ?遺遺꾩? ?꾩쭅 CLI 洹쒖튃?쇰줈 援ы쁽?섏? ?딆븯??
+따라서 `Track A 완료`라는 표현은 부정확하다. 더 정확한 상태는 **Track A 일부 완료**다. 괄호와 null initializer
+잉여는 처리했지만, 명시 타입 var 계열 대부분은 아직 CLI 규칙으로 구현되지 않았다.
 
-6869 ?щ텇??湲곗? ?붿뿬:
+6869 재분석 기준 잔여:
 
-| 泥댁빱 | ?붿뿬 |
+| 체커 | 잔여 |
 |---|---:|
 | `PRACTICE.OBJECT_INSTANTIATION.NOT_USED_IMPLICIT_TYPING` | 515 |
 | `PRACTICE.LOOP_VARIABLE.NOT_USED_IMPLICIT_TYPING` | 117 |
 | `PRACTICE.OBVIOUS_VARIABLE_TYPE.NOT_USED_IMPLICIT_TYPING` | 48 |
-| **?⑷퀎** | **680** |
+| **합계** | **680** |
 
-## 援ы쁽 ?먯튃
+## 구현 원칙
 
-- ?먮떒 ?녿뒗 臾몃쾿 蹂?섏? CLI媛 泥섎━?쒕떎.
-- ?섎? 蹂??媛?μ꽦???덈뒗 蹂?섎룄, ?좊ː?깆떆???④퀎??肄붾뱶?쇰뒗 ?꾩젣? 鍮뚮뱶 寃뚯씠?몃? 理쒖쥌 ?덉쟾留앹쑝濡??먭퀬
-  **蹂꾨룄 洹쒖튃/蹂꾨룄 而ㅻ컠**?쇰줈 ?곸슜?????덈떎.
-- ?꾪뿕?꾧? ?믪? 洹쒖튃? 而ㅻ컠紐낆뿉 `review-needed` ?먮뒗 `寃?좏븘??瑜?媛뺤젣濡??ｋ뒗??
-- ?뚯뒪??二쇱꽍???쎌엯?섏? ?딅뒗?? ?꾩슂??寃쎌슦 蹂꾨룄 ledger/report瑜?留뚮뱺??
-- 洹쒖튃蹂??ㅽ뻾怨?洹쒖튃蹂?而ㅻ컠???좎??쒕떎. 臾몄젣媛 ?앷린硫??대떦 洹쒖튃 而ㅻ컠留??섎룎由????덉뼱???쒕떎.
+- 판단 없는 문법 변환만 CLI가 처리한다.
+- 의미 변경 가능성이 있는 변환도, 신뢰성시험 단계의 코드라는 전제와 빌드 게이트를 최종 안전망으로 삼고
+  **별도 규칙/별도 커밋**으로 적용할 수 있다.
+- 위험도가 높은 규칙은 커밋명에 `review-needed` 또는 `검토필요`를 강제로 넣는다.
+- 테스트 주석을 삽입하지 않는다. 필요한 경우 별도 ledger/report를 만든다.
+- 규칙별 실행과 규칙별 커밋을 유지한다. 문제가 생기면 해당 규칙 커밋만 되돌릴 수 있어야 한다.
 
-## ?좉퇋 洹쒖튃
+## 신규 규칙
 
 ### 1. `objectvar-safe`
 
-?좎뼵 ??낃낵 ?앹꽦 ??낆씠 ?숈씪??媛앹껜 ?앹꽦留??먮룞 蹂?섑븳??
+선언 타입과 생성 타입이 동일한 객체 생성만 자동 변환한다.
 
 ```csharp
 Foo x = new Foo();
@@ -57,22 +64,23 @@ var x = new Foo();
 var y = new Foo(arg1, arg2);
 ```
 
-湲곕낯 ?덉쟾 議곌굔:
+기본 안전 조건:
 
-- local declaration留????
-- ?⑥씪 declarator留????
-- ??낆씠 ?대? `var`?대㈃ skip.
-- ?좎뼵 ??낃낵 `new` ??낆쓽 ?띿뒪?멸? ?숈씪?섎㈃ 蹂??
-- `using` local, field, property??????꾨떂.
+- local declaration만 대상.
+- 단일 declarator만 대상.
+- 타입이 이미 `var`이면 skip.
+- 선언 타입과 `new` 타입의 텍스트가 동일하면 변환.
+- `using` local, field, property는 대상이 아님.
 
-湲곕낯 而ㅻ컠紐???
+기본 커밋명:
 
 ```text
 sparrow(A): object instantiation var safe
 ```
 
-### 2. `objectvar-narrowing` ??寃?좏븘??
-?명꽣?섏씠??湲곕컲????좎뼵???ㅼ젣 ?앹꽦 ??낆쑝濡?醫곹엳??蹂?섏씠??
+### 2. `objectvar-narrowing` — 검토필요
+
+인터페이스/기반타입 선언을 실제 생성 타입으로 좁히는 변환이다.
 
 ```csharp
 IList<string> x = new List<string>();
@@ -86,18 +94,19 @@ var x = new Derived();
 var x = new Foo();
 ```
 
-?遺遺?鍮뚮뱶? ?고????숈옉? ?좎??섏?留? 蹂?섏쓽 ?뺤쟻 ??낆씠 諛붾뚮?濡??ㅻ쾭濡쒕뱶 ?좏깮, generic inference,
-extension method binding???щ씪吏????덈떎. ?곕씪???먮룞?붾뒗 ?덉슜?섎릺 諛섎뱶??蹂꾨룄 洹쒖튃/蹂꾨룄 而ㅻ컠?쇰줈 遺꾨━?쒕떎.
+대부분 빌드와 런타임 동작은 유지되지만, 변수의 정적 타입이 바뀌므로 오버로드 선택, generic inference,
+extension method binding이 달라질 수 있다. 따라서 자동화는 허용하되 반드시 별도 규칙/별도 커밋으로 분리한다.
 
-而ㅻ컠紐낆? 諛섎뱶??二쇱쓽 ?좏샇瑜??ы븿?쒕떎.
+커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
 sparrow(A)! review-needed: static type narrowing to var
-sparrow(A)! 寃?좏븘?? ?명꽣?섏씠??湲곕컲???var 蹂??```
+sparrow(A)! 검토필요: 인터페이스 기반 타입 var 변환
+```
 
 ### 3. `foreachcast`
 
-紐낆떆 ???`foreach`瑜?`var`濡?諛붽씀?? non-generic enumerable?먯꽌 鍮뚮뱶媛 源⑥???寃껋쓣 留됯린 ?꾪빐 `Cast<T>`瑜??ъ슜?쒕떎.
+명시 타입 `foreach`를 `var`로 바꾸되, non-generic enumerable에서 빌드가 깨지는 것을 막기 위해 `Cast<T>`를 사용한다.
 
 ```csharp
 foreach (XmlNode node in clsNodes)
@@ -107,15 +116,15 @@ foreach (XmlNode node in clsNodes)
 foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(clsNodes))
 ```
 
-???뺤콉??湲곕낯媛믪쑝濡??붾떎. ?⑥닚 蹂?섏씤 `foreach (var node in clsNodes)`??`XmlNodeList` 媛숈? non-generic 而щ젆?섏뿉??`node`媛 `object`濡?異붾줎?????덉뼱 湲곕낯媛믪쑝濡??곗? ?딅뒗??
+이 정책을 기본값으로 둔다. 단순 변환인 `foreach (var node in clsNodes)`는 `XmlNodeList` 같은 non-generic 컬렉션에서 `node`가 `object`로 추론될 수 있어 기본값으로 쓰지 않는다.
 
-skip 議곌굔:
+skip 조건:
 
-- ?대? `var`??寃쎌슦.
-- enumerable expression???대? `Cast<T>()` ?먮뒗 `OfType<T>()` ?몄텧??寃쎌슦.
-- declaration type???녾굅???뚯떛??遺덉셿?꾪븳 寃쎌슦.
+- 이미 `var`인 경우.
+- enumerable expression이 이미 `Cast<T>()` 또는 `OfType<T>()` 호출인 경우.
+- declaration type이 없거나 파싱이 불완전한 경우.
 
-而ㅻ컠紐???
+커밋명:
 
 ```text
 sparrow(A): foreach implicit type with Cast<T>
@@ -123,9 +132,9 @@ sparrow(A): foreach implicit type with Cast<T>
 
 ### 4. `obviousvar`
 
-?ㅻⅨ履?initializer?먯꽌 ??낆씠 紐낇솗??吏??蹂?섎? `var`濡?諛붽씔??
+오른쪽 initializer에서 타입이 명확한 지역 변수를 `var`로 바꾼다.
 
-臾몄옄??臾몄옄/bool泥섎읆 literal???먮옒 ?뺤쟻 ??낆쓣 洹몃?濡?蹂댁〈?섎뒗 寃쎌슦:
+문자열/문자/bool처럼 literal이 원래 정적 타입을 그대로 보존하는 경우:
 
 ```csharp
 string s = "A";
@@ -139,7 +148,7 @@ var ok = true;
 var c = 'x';
 ```
 
-?レ옄 literal泥섎읆 `var`媛 ??醫곸? ??낆쑝濡?異붾줎?????덈뒗 寃쎌슦??cast濡??먮옒 ?뺤쟻 ??낆쓣 蹂댁〈?쒕떎.
+숫자 literal처럼 `var`가 더 좁은 타입으로 추론될 수 있는 경우는 cast로 원래 정적 타입을 보존한다.
 
 ```csharp
 double markerH = 20;
@@ -153,7 +162,7 @@ var count = (long)1;
 var pageSize = (int?)0;
 ```
 
-怨듭떇 rule ?덉떆??`Convert.ToXxx` 怨꾩뿴????곸씠??
+공식 rule 예시의 `Convert.ToXxx` 계열은 대상이 아니다.
 
 ```csharp
 // Convert.ToXxx is intentionally not rewritten in syntax-only mode.
@@ -163,14 +172,15 @@ var pageSize = (int?)0;
 // Use an explicit cast/literal case instead.
 ```
 
-而ㅻ컠紐???
+커밋명:
 
 ```text
 sparrow(A): obvious local var conversions
 ```
 
-### 5. `localconst` ??寃?좏븘??
-吏??`const`???꾩뿭/?대옒??`private const`濡??밴꺽?섏? ?딅뒗?? ???吏??`var`濡???텣??
+### 5. `localconst` — 검토필요
+
+지역 `const`는 전역/클래스 `private const`로 승격하지 않는다. 대신 지역 `var`로 낮춘다.
 
 ```csharp
 const string name = "Description";
@@ -182,24 +192,26 @@ var name = "Description";
 var limit = (double)20;
 ```
 
-??蹂?섏? 吏???곸닔?깆쓣 ?쒓굅?쒕떎. ?좊ː?깆떆???④퀎??肄붾뱶 洹쒖튃 ?뚭굅 愿?먯뿉?쒕뒗 ?ㅼ슜?곸쑝濡??섏슜?섏?留? compile-time
-constant ?붽뎄 ?꾩튂???곗씤 寃쎌슦 源⑥쭏 ???덉쑝誘濡?蹂꾨룄 洹쒖튃/蹂꾨룄 而ㅻ컠?쇰줈 ?붾떎.
+이 변환은 지역 상수성을 제거한다. 신뢰성시험 단계의 코드 규칙 제거 관점에서는 실용적으로 수용하지만, compile-time
+constant 요구 위치에 쓰인 경우 깨질 수 있으므로 별도 규칙/별도 커밋으로 둔다.
 
-理쒖냼 guardrail:
+최소 guardrail:
 
-- local declaration留????
-- ?⑥씪 declarator留????
-- initializer媛 literal ?먮뒗 ?⑥닚 cast 蹂댁〈 媛?ν븳 ?앹씪 ?뚮쭔 ???
-- 媛숈? method/block ?덉뿉 `case <identifier>:` ?ъ슜??蹂댁씠硫?skip.
+- local declaration만 대상.
+- 단일 declarator만 대상.
+- initializer가 literal 또는 단순 cast 보존이 가능한 단일 식일 때만 대상.
+- 같은 method/block 안에 `case <identifier>:` 사용이 보이면 skip.
 
-而ㅻ컠紐낆? 諛섎뱶??二쇱쓽 ?좏샇瑜??ы븿?쒕떎.
+커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
 sparrow(A)! review-needed: demote local const to var
-sparrow(A)! 寃?좏븘?? 吏??const var 蹂??```
+sparrow(A)! 검토필요: 지역 const var 변환
+```
 
-### 6. `nullvar` ??寃?좏븘??
-湲곗〈 `nullcast`瑜??뺤옣?쒕떎. `Foo x = null;`肉??꾨땲??initializer ?녿뒗 吏??蹂?섎룄 typed null濡?珥덇린?뷀빐 `var`瑜?留뚮뱺??
+### 6. `nullvar` — 검토필요
+
+기존 `nullcast`를 확장한다. `Foo x = null;`뿐 아니라 initializer 없는 지역 변수도 typed null로 초기화해 `var`를 만든다.
 
 ```csharp
 Foo x = null;
@@ -211,28 +223,29 @@ var x = (Foo)null;
 var y = (Foo)null;
 ```
 
-?좊ː?깆떆???④퀎??肄붾뱶???대? 鍮뚮뱶媛 ?듦낵?쒕떎???꾩젣瑜??붾떎. ?곕씪??湲곗〈 `Foo y;`???ъ슜 ??紐⑤뱺 而댄뙆??寃쎈줈?먯꽌
-?좊떦?섏뼱 ?덉뼱???쒕떎. 珥덇린 `(Foo)null`? Sparrow 肄붾뱶 洹쒖튃 ?뚭굅瑜??꾪븳 ?ㅼ슜 蹂?섏쑝濡?痍④툒?쒕떎.
+신뢰성시험 단계의 코드는 이미 빌드가 통과한다는 전제를 둔다. 따라서 기존 `Foo y;`는 사용 전 모든 컴파일 경로에서
+할당되어 있어야 한다. 초기 `(Foo)null`은 Sparrow 코드 규칙 제거를 위한 실용 변환으로 취급한다.
 
-洹몃옒??而댄뙆?쇰윭??definite assignment ?덉쟾留앹쓣 ?쏀븯寃?留뚮뱶??蹂?섏씠誘濡?蹂꾨룄 洹쒖튃/蹂꾨룄 而ㅻ컠?쇰줈 ?붾떎.
+그래도 컴파일러의 definite assignment 안전망을 약하게 만드는 변환이므로 별도 규칙/별도 커밋으로 둔다.
 
-skip 議곌굔:
+skip 조건:
 
-- `var` ???
+- 이미 `var`인 선언.
 - `const`, `using` local.
-- ?ㅼ쨷 declarator.
-- predefined value type ?ㅼ썙??`int`, `double`, `bool` ?? no-initializer???곗꽑 skip.
-- field/property??????꾨떂.
+- 다중 declarator.
+- predefined value type 키워드(`int`, `double`, `bool` 등) no-initializer는 우선 skip.
+- field/property는 대상이 아님.
 
-而ㅻ컠紐낆? 諛섎뱶??二쇱쓽 ?좏샇瑜??ы븿?쒕떎.
+커밋명은 반드시 주의 신호를 포함한다.
 
 ```text
 sparrow(A)! review-needed: initialize explicit locals as typed null
-sparrow(A)! 寃?좏븘?? 誘몄큹湲고솕 吏?????typed-null var 蹂??```
+sparrow(A)! 검토필요: 미초기화 지역 변수 typed-null var 변환
+```
 
-## 沅뚯옣 ?ㅽ뻾 ?쒖꽌
+## 권장 실행 순서
 
-湲곕낯 ?덉쟾 洹쒖튃遺???곸슜?섍퀬, 寃?좏븘??洹쒖튃? ?ㅼ뿉 遺꾨━?쒕떎.
+기본 안전 규칙부터 적용하고, 검토필요 규칙은 뒤에 분리한다.
 
 ```powershell
 .\Run-SparrowSyntaxFix.ps1
@@ -243,51 +256,51 @@ sparrow(A)! 寃?좏븘?? 誘몄큹湲고솕 吏?????typed-null var 蹂??``
 `Run-SparrowSyntaxFix.ps1 -Commit`은 규칙별 커밋 메시지를 붙이며 `foreachcast`, `objectinitializer`,
 `objectvar-narrowing`, `localconst`, `nullvar`, `arrayvar-narrowing`은 커밋명에 `검토필요`를 드러낸다.
 
-## Fixture ?꾩닔 耳?댁뒪
+## Fixture 필수 케이스
 
 ### `objectvar-safe`
 
-- `Foo x = new Foo();` ??`var x = new Foo();`
-- `Foo x = new Foo(arg);` ??`var x = new Foo(arg);`
-- `IFoo x = new Foo();`??`objectvar-safe`?먯꽌 skip.
+- `Foo x = new Foo();` → `var x = new Foo();`
+- `Foo x = new Foo(arg);` → `var x = new Foo(arg);`
+- `IFoo x = new Foo();`는 `objectvar-safe`에서 skip.
 
 ### `objectvar-narrowing`
 
-- `IFoo x = new Foo();` ??`var x = new Foo();`
-- `IList<string> x = new List<string>();` ??`var x = new List<string>();`
-- 而ㅻ컠/異쒕젰 ?쇰꺼??`review-needed` 怨꾩뿴?몄? ?뺤씤.
+- `IFoo x = new Foo();` → `var x = new Foo();`
+- `IList<string> x = new List<string>();` → `var x = new List<string>();`
+- 커밋/출력 라벨이 `review-needed` 계열인지 확인.
 
 ### `foreachcast`
 
-- `foreach (XmlNode node in clsNodes)` ??`foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(clsNodes))`
-- ?대? `foreach (var node in xs)`??skip.
-- ?대? `foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(xs))`??skip.
+- `foreach (XmlNode node in clsNodes)` → `foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(clsNodes))`
+- 이미 `foreach (var node in xs)`면 skip.
+- 이미 `foreach (var node in System.Linq.Enumerable.Cast<XmlNode>(xs))`면 skip.
 
 ### `obviousvar`
 
-- `string s = "A";` ??`var s = "A";`
-- `bool ok = true;` ??`var ok = true;`
-- `double d = 20;` ??`var d = (double)20;`
-- `int? n = 0;` ??`var n = (int?)0;`
+- `string s = "A";` → `var s = "A";`
+- `bool ok = true;` → `var ok = true;`
+- `double d = 20;` → `var d = (double)20;`
+- `int? n = 0;` → `var n = (int?)0;`
 - `Convert.ToXxx` 계열은 syntax-only symbol identity 보장이 없어 skip.
 
 ### `localconst`
 
-- `const string s = "A";` ??`var s = "A";`
-- `const double d = 20;` ??`var d = (double)20;`
-- `case s:` 媛숈? compile-time constant ?붽뎄 ?ъ슜???덉쑝硫?skip.
+- `const string s = "A";` → `var s = "A";`
+- `const double d = 20;` → `var d = (double)20;`
+- `case s:` 같은 compile-time constant 요구 사용이 있으면 skip.
 
 ### `nullvar`
 
-- `Foo x = null;` ??`var x = (Foo)null;`
-- `Foo x;` ??`var x = (Foo)null;`
-- `int x;`??skip.
-- `Foo a, b;`??1李?援ы쁽?먯꽌 skip.
+- `Foo x = null;` → `var x = (Foo)null;`
+- `Foo x;` → `var x = (Foo)null;`
+- `int x;`는 skip.
+- `Foo a, b;`는 1차 구현에서 skip.
 
-## ?깃났 湲곗?
+## 성공 기준
 
-- 洹쒖튃蹂?fixture ?듦낵.
-- `SparrowSyntaxFix` ??踰덉㎏ ?ㅽ뻾 ??idempotent.
-- ????붾（??鍮뚮뱶 ?듦낵.
-- Sparrow ?щ텇?앹뿉???대떦 Track A 泥댁빱 嫄댁닔媛 媛먯냼.
-- 寃?좏븘??洹쒖튃? 蹂꾨룄 而ㅻ컠?쇰줈 遺꾨━?섏뼱 ?덉뼱???쒕떎.
+- 규칙별 fixture 통과.
+- `SparrowSyntaxFix` 두 번째 실행 시 idempotent.
+- 대상 솔루션 빌드 통과.
+- Sparrow 재분석에서 해당 Track A 체커 건수가 감소.
+- 검토필요 규칙은 별도 커밋으로 분리되어 있어야 한다.

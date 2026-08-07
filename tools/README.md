@@ -8,7 +8,7 @@ Run-SparrowRunnerGui.cmd
 
 ## 무엇을 써야 하나요?
 
-- `Run-SparrowRunnerGui.cmd`: [코드 자동수정 (C#)]([코드 규칙] · [주석·레이아웃])과 [XLS 분리 (모든 언어)]를 한 화면에서 실행하는 권장 진입점입니다. [XLS 분리]는 Sparrow 결과 XLS 하나만 받아 검출 전건을 체커 키 폴더별 항목 md(`<체커키>\{ID}_{파일명}_{라인}.md`)로 분리합니다. 인덱스/요약 파일은 만들지 않으며, 준비해야 할 선행 파일도 없습니다.
+- `Run-SparrowRunnerGui.cmd`: **[코드 자동수정 (C#)]** ([코드 규칙] · [주석·레이아웃])과 **[XLS 분리 (모든 언어)]** 를 한 화면에서 실행하는 권장 진입점입니다. [XLS 분리]는 Sparrow 결과 XLS 하나만 받아 검출 전건을 체커 키 폴더별 항목 md(`<체커키>\{ID}_{파일명}_{라인}.md`)로 분리합니다. 인덱스/요약 파일은 만들지 않으며, 준비해야 할 선행 파일도 없습니다.
   - 화면 명칭 ↔ 내부 트랙: **[코드 규칙] = Track A · [주석·레이아웃] = Track B · [XLS 분리] = Track C**(트랙은 내부 명칭이라 화면에는 안 나옵니다).
   - **GUI 는 파일만 고치고 커밋하지 않습니다**(러너에 `-NoCommit` 고정). 실행 후 `N개 파일 수정됨 — 커밋하지 않았습니다. git diff 로 검토 후 커밋하세요.` 안내가 나오며, 커밋은 사용자가 직접 합니다. 자동 커밋(`-Commit`)·`-DryRun`·`-IncludeGenerated`·`-VerifyCmd` 는 아래 CLI 러너 옵션으로 남아 있습니다.
 - `Run-SparrowAll.cmd`: GUI 없이 코드 규칙(Track A)·주석/레이아웃(Track B)만 순차 실행해야 할 때 쓰는 보조 진입점입니다.
@@ -44,10 +44,18 @@ Run-SparrowRunnerGui.cmd
 GUI/러너는 컴파일된 도구 exe가 있어야 동작합니다. 올바른 최소 반입 단위는 다음과 같습니다.
 
 1. 인터넷 + `.NET SDK`가 있는 PC에서 `tools\publish-airgap.ps1`을 한 번 실행해 도구 4종을 `publish\`로 발행합니다.
-2. **`skills\sparrow-static-analysis` 폴더 트리 전체**(발행된 `publish\` 산출물 포함)를 폐쇄망 PC로 복사합니다. Track C 익스포터는 선행 문서를 읽지 않으므로 따로 챙길 자료는 없습니다.
+2. **레포 폴더 트리 전체**(발행된 `publish\` 산출물 포함)를 폐쇄망 PC로 복사합니다. Track C 익스포터는 선행 문서를 읽지 않으므로 따로 챙길 자료는 없습니다.
 3. 폐쇄망 PC에서 `Run-SparrowRunnerGui.cmd`를 실행하면 `SparrowRunner.Gui\publish\SparrowRunner.Gui.exe`를
    자동으로 사용하고, 러너는 `publish\SparrowSyntaxFix.exe` / `publish\SparrowCommentFix.exe`를 자동으로 집어 씁니다
    (`dotnet build`/NuGet 복원 불필요).
 
 기본 발행은 self-contained라 대상 PC에 `.NET` 런타임이 필요 없습니다. 자세한 절차는
-`docs/sparrow-static-analysis-usage.md`의 "폐쇄망 반입(오프라인 배포)" 절을 참고하세요.
+[`docs/usage.md`](../docs/usage.md#폐쇄망-반입오프라인-배포)의 "폐쇄망 반입(오프라인 배포)" 절을 참고하세요.
+
+---
+
+## 더 읽을 것
+
+- 구조와 프로세스 경계, 러너 CLI 계약: [`docs/architecture.md`](../docs/architecture.md)
+- 규칙 추가 / 새 언어 트랙 추가: [`docs/extending.md`](../docs/extending.md)
+- 빌드·테스트·인코딩 규약: [`CONTRIBUTING.md`](../CONTRIBUTING.md)

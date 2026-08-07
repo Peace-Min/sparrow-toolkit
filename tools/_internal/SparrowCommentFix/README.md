@@ -114,7 +114,7 @@ in PowerShell, then hands the resulting full paths to the tool via a temp `--fil
   can change documentation output or are best-effort structural rewrites.
 - Runs each selected rule in a fixed order (`flatten`, `trailing`, `space`, `period`, `onedeclaration`,
   `onestatement`, `memberblank`, `linqalign`, `continuation`), honoring `-DryRun`.
-- **Commit UX mirrors `Run-SparrowSyntaxFix.ps1` / `Run-SparrowSyntaxFix.ps1`**: with `-Commit` it makes a per-rule
+- **Commit UX mirrors `Run-SparrowSyntaxFix.ps1`**: with `-Commit` it makes a per-rule
   git commit (`sparrow: <label> (SparrowCommentFix)`, staging `*.cs`); with `-DryRun` it commits nothing;
   with neither, an interactive run **prompts** `규칙별로 커밋할까요? (Y/N)` (non-interactive → no commit).
   Writes a timestamped `.log` next to the working dir.
@@ -136,11 +136,20 @@ directory, then replace) and happen **only when the bytes actually change** (no 
 rule (before/after), the string-literal safety guarantee, idempotency, `--dry-run`, `--files-from`, and the
 unknown-rule exit code. Wired into the validate gate:
 
-```
-powershell -ExecutionPolicy Bypass -File tests/validate.ps1 -IncludeCommentE2E
+```powershell
+./validate.ps1 -IncludeCommentE2E          # from the repo root
 ```
 
 ## Air-gap bundling
 
-The built `SparrowCommentFix` exe ships in the `dotnet-gcdump-offline` bundle, mirroring how SparrowXlsExport
-is delivered into the closed network.
+`tools/publish-airgap.ps1` publishes this tool (self-contained `win-x64` by default) to
+`tools/_internal/SparrowCommentFix/publish/SparrowCommentFix.exe`, alongside SparrowSyntaxFix,
+SparrowXlsExport and the WPF GUI. The runner picks that `publish\` exe up automatically, so the
+air-gapped machine needs no .NET SDK and no NuGet restore. See
+[../../../CONTRIBUTING.md](../../../CONTRIBUTING.md#폐쇄망-발행) and
+[../../../docs/usage.md](../../../docs/usage.md#폐쇄망-반입오프라인-배포).
+
+## Adding a rule
+
+See [`docs/extending.md` 레시피 1](../../../docs/extending.md#레시피-1-기존-c-트랙에-규칙-추가) —
+it lists every touch point (rule implementation, rule-key registry, runner labels, GUI checkbox, fixtures).

@@ -1,21 +1,24 @@
-# Sparrow Static Analysis 사용/확장 가이드
+# 사용 가이드 (운영자용)
 
-`sparrow-static-analysis`는 Sparrow 정적분석 결과 조치를 반복 가능하게 만들기 위한 폐쇄망용 헬퍼다. 정형화된 코딩/주석 위반 패턴은 Roslyn 기반 CLI로 자동 조치하고, 보안/품질 판단 항목과 예외 케이스는 **체커별 Markdown 파일로 분리**해 LLM 또는 개발자가 체커 단위로 작업한다.
+`sparrow-toolkit`은 Sparrow 정적분석 결과 조치를 반복 가능하게 만들기 위한 폐쇄망용 헬퍼다. 정형화된 코딩/주석 위반 패턴은 Roslyn 기반 CLI로 자동 조치하고, 보안/품질 판단 항목과 예외 케이스는 **체커별 Markdown 파일로 분리**해 LLM 또는 개발자가 체커 단위로 작업한다.
+
+> 이 문서는 **도구를 쓰는 사람**을 위한 것이다. 도구를 **고치거나 확장하려면**
+> [architecture.md](architecture.md) → [extending.md](extending.md) → [../CONTRIBUTING.md](../CONTRIBUTING.md) 순으로 읽는다.
 
 > **Track C는 순수 익스포터다.** 선행 문서(체커 가이드·프롬프트·판정 계약)를 일절 요구하지 않는다. 입력은 Sparrow `.xls` 하나이고, 출력은 체커 키 폴더 + 그 안의 항목 md(`<체커키>/{ID}_{파일명}_{라인}.md`) 뿐이다.
 
 ## 빠른 실행
 
-Visual Studio 사용자는 다음 솔루션을 연다.
+Visual Studio 사용자는 다음 솔루션을 연다(레포 루트 기준 상대 경로).
 
 ```text
-skills/sparrow-static-analysis/SparrowRunner.Gui/SparrowRunner.Gui.sln
+SparrowRunner.Gui/SparrowRunner.Gui.sln
 ```
 
 명령줄에서 GUI를 바로 실행하려면 다음 파일을 사용한다.
 
 ```text
-skills/sparrow-static-analysis/tools/Run-SparrowRunnerGui.cmd
+tools/Run-SparrowRunnerGui.cmd
 ```
 
 ## GUI 화면 구성 — 대분류 2개
@@ -69,16 +72,16 @@ GUI와 러너는 평소 `dotnet run`/`dotnet build`로 동작한다. 이는 대�
 
    ```powershell
    # 기본: self-contained win-x64 (대상 PC에 .NET 런타임 불필요)
-   .\skills\sparrow-static-analysis\tools\publish-airgap.ps1
+   .\tools\publish-airgap.ps1
 
    # 산출물 크기를 줄이려면(대상 PC에 .NET 8 런타임 필요)
-   .\skills\sparrow-static-analysis\tools\publish-airgap.ps1 -FrameworkDependent
+   .\tools\publish-airgap.ps1 -FrameworkDependent
 
    # 무엇을 어디로 발행할지 미리보기(빌드 안 함)
-   .\skills\sparrow-static-analysis\tools\publish-airgap.ps1 -DryRun
+   .\tools\publish-airgap.ps1 -DryRun
    ```
 
-2. **`skills/sparrow-static-analysis` 폴더 트리 전체**를 폐쇄망 PC로 복사한다. 반드시 함께 넘겨야 하는 것:
+2. **레포 폴더 트리 전체**를 폐쇄망 PC로 복사한다. 반드시 함께 넘겨야 하는 것:
    - 방금 생성된 `publish\` 산출물 4곳(`SparrowRunner.Gui\publish\`, `_internal\SparrowSyntaxFix\publish\`, `_internal\SparrowCommentFix\publish\`, `_internal\SparrowXlsExport\publish\`)
    - `tools\`의 러너/진입점(`Run-SparrowRunnerGui.cmd`, `Run-SparrowAll.cmd`, `_internal\...\Run-*.ps1`, `Compare-Sparrow.ps1`)
 
@@ -109,7 +112,7 @@ GUI와 러너는 평소 `dotnet run`/`dotnet build`로 동작한다. 이는 대�
 ## 디렉터리 구조
 
 ```text
-skills/sparrow-static-analysis/
+sparrow-toolkit/
   SparrowRunner.Gui/
     SparrowRunner.Gui.sln        # 사용자/Visual Studio 진입점
   tools/
@@ -166,7 +169,7 @@ skills/sparrow-static-analysis/
 
 GUI의 [XLS 분리] 화면에는 xls/출력/범위 컨트롤과 함께 요약(**"검출 체커 N종 · 매핑 M · 미매핑 K"**, 지정 기준)과 **[체커 규칙 관리]** 버튼만 있다. 규칙 CRUD와 체커 지정은 **별도 창(체커 규칙 관리)**에서 한다:
 
-- **A. 규칙 라이브러리** (xls 무관): 이름 붙인 규칙 목록 + 에디터. [새 규칙](이름+내용 입력 후 [규칙 저장])으로 만들고, 목록에서 골라 편집한다. 규칙 md는 UTF-8(BOM 없이)로 저장된다. 창을 열면 **첫 규칙이 자동 선택**되어 이름·내용이 채워진 상태로 보이고, 파괴적인 **[선택 규칙 삭제]** 는 [새 규칙] 옆이 아니라 **목록 아래 우측**에 따로 있다(실수 클릭 방지 · 확인 다이얼로그는 그대로).
+- **A. 규칙 라이브러리** (xls 무관): 이름 붙인 규칙 목록 + 에디터. **[새 규칙]** 버튼으로 만들고(이름·내용을 입력한 뒤 **[규칙 저장]**), 목록에서 골라 편집한다. 규칙 md는 UTF-8(BOM 없이)로 저장된다. 창을 열면 **첫 규칙이 자동 선택**되어 이름·내용이 채워진 상태로 보이고, 파괴적인 **[선택 규칙 삭제]** 는 [새 규칙] 옆이 아니라 **목록 아래 우측**에 따로 있다(실수 클릭 방지 · 확인 다이얼로그는 그대로).
 - **B. 체커 매핑** (현재 xls의 검출 체커): 각 체커 행 = 체커 키 + 건수 + **규칙 선택 ComboBox**(라이브러리 규칙들 + "— 없음 —"). 규칙을 고르면 그 체커의 지정이 바뀌고, **기억된 지정은 미리 선택**되어 나타난다(파일명이 체커 키와 같아도 지정 안 했으면 "— 없음 —"). [지정 저장]이 `_assignments.json`에 기록한다. 미지정 체커가 위로 정렬된다.
 
 **실행하면** `_assignments.json`을 읽어 **지정된 체커만** 그 규칙을 해당 체커의 모든 항목 md에 self-contained 부착하고(멱등), 지정 안 된 체커는 순수 출력이다. 흐름은 **xls 로드 → 규칙 관리 창에서 지정 → 실행(지정만 부착)** 이다. CLI에서는 `--guides <폴더>`를 주면 그 폴더의 `_assignments.json` 지정대로 부착한다(주지 않으면 순수).
@@ -268,10 +271,12 @@ Track C를 한 번 돌릴 때마다 **기계 판독 가능한** 실행 증거가
 ## 기본 검증
 
 ```powershell
-dotnet build .\skills\sparrow-static-analysis\SparrowRunner.Gui\SparrowRunner.Gui.sln -c Release
-dotnet build .\skills\sparrow-static-analysis\tools\_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj -c Release
-dotnet build .\skills\sparrow-static-analysis\tools\_internal\SparrowCommentFix\SparrowCommentFix.csproj -c Release
-dotnet build .\skills\sparrow-static-analysis\tools\_internal\SparrowXlsExport\SparrowXlsExport.csproj -c Release
+# 이 솔루션에는 GUI + SparrowXlsExport.Core 두 프로젝트만 들어 있다.
+dotnet build .\SparrowRunner.Gui\SparrowRunner.Gui.sln -c Release
+# 엔진 CLI 3종은 솔루션 밖이라 개별 빌드한다.
+dotnet build .\tools\_internal\SparrowSyntaxFix\SparrowSyntaxFix.csproj -c Release
+dotnet build .\tools\_internal\SparrowCommentFix\SparrowCommentFix.csproj -c Release
+dotnet build .\tools\_internal\SparrowXlsExport\SparrowXlsExport.csproj -c Release
 ```
 
 PowerShell runner를 수정한 경우 파서 검사를 수행한다.
