@@ -447,7 +447,7 @@ namespace SparrowRunner.Gui
             string target = TargetPathBox.Text.Trim().Trim('"');
             if (string.IsNullOrEmpty(target) || (!File.Exists(target) && !Directory.Exists(target)))
             {
-                MessageBox.Show(this, "대상 .sln/.csproj 또는 소스 폴더를 먼저 선택하세요.", "입력 확인",
+                MessageBox.Show(this, "대상 폴더를 먼저 선택하세요.", "입력 확인",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -996,7 +996,7 @@ namespace SparrowRunner.Gui
             string target = TargetPathBox.Text.Trim().Trim('"');
             if (string.IsNullOrWhiteSpace(target) || (!File.Exists(target) && !Directory.Exists(target)))
             {
-                MessageBox.Show(this, "대상 .sln/.csproj 또는 소스 폴더를 먼저 선택하세요.", "git 저장소 만들기",
+                MessageBox.Show(this, "대상 폴더를 먼저 선택하세요.", "git 저장소 만들기",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

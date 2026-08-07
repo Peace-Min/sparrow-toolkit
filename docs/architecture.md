@@ -241,7 +241,8 @@ sparrow-toolkit/
                                  #   담긴 프로젝트: SparrowRunner.Gui + SparrowXlsExport.Core (2개뿐)
 
   tools/
-    Run-SparrowRunnerGui.cmd     # GUI 실행(발행본 있으면 그걸, 없으면 dotnet run)
+    Run-SparrowRunnerGui.cmd     # GUI 실행(발행본 있으면 그걸, 없으면 dotnet run).
+                                 #   실행 바이너리를 [INFO] 로 출력하고, 발행본이 로컬 빌드보다 낡으면 [WARN]
     Run-SparrowAll.cmd/.ps1      # GUI 없이 [코드 규칙]→[주석·레이아웃] 순차 실행
     Compare-Sparrow.ps1          # 전/후 xls 비교 G2 회귀 게이트
     publish-airgap.ps1           # 폐쇄망 반입 발행(도구 4종)

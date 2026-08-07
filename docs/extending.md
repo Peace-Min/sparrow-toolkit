@@ -120,7 +120,9 @@ internal enum SyntaxRule
 
 1. `MainWindow.xaml` 의 `CodeRuleTab` 안 `UniformGrid` 에 체크박스 하나:
    `<CheckBox x:Name="ASHoge" Content="사람이 읽는 규칙 이름" Style="{StaticResource RuleCheck}"/>`
-   (기본 켜짐이면 `IsChecked="True"`. `[검토필요]` 규칙은 Content 앞에 `[검토필요] ` 를 붙이는 관례.)
+   (기본 켜짐이면 `IsChecked="True"`. `[검토필요]` 규칙은 Content 앞에 `[검토필요] ` 를 붙이는 관례.
+   UIA 로 단정할 생각이면 `AutomationProperties.AutomationId="ASHoge"` 도 함께 준다 →
+   [부록](#부록-ui-요소를-추가할-때의-automationid-규약).)
 2. `MainWindow.xaml.cs` 의 `BuildJobs()` → `CollectRules(...)` 목록에 `(ASHoge, "hoge")` 추가.
    **이걸 빠뜨리면 체크박스는 보이는데 아무 일도 일어나지 않는다.**
 3. `MainWindow.xaml.cs` 의 `InitializeRuleInfo()` 에 `AddRuleInfo(ASHoge, 제목, 설명, 근거, 예제)` 추가.
@@ -286,7 +288,7 @@ C# 러너에 `.cpp` 가 넘어간다. 갈래별로 확장자 집합을 갈라 �
 | **0 · P0** | `MainWindow.xaml.cs` 실행 핸들러의 **범위 가드** | `EnsureScopeAsync(target)` 결과가 `SelectedFiles.Count == 0` 이면 `"선택된 .cs 파일이 없습니다"` 를 띄우고 **`BuildJobs()` 에 도달하기 전에 return** 한다. 범위 트리가 `.cs` 만 모으는 한 **C/C++ 폴더는 여기서 먼저 막힌다** — 새 러너를 아무리 잘 만들어도 호출조차 안 된다. [2.2.2](#222-소스-파일-확장자는-러너가-아니라-엔진gui-에-있다) 의 `SourceScopeDiscovery` 확장과 **한 쌍**이고, 메시지 문구도 `.cs` 고정이라 함께 고친다 |
 | 1 | `MainWindow.xaml.cs` (`private enum ActiveMode { CodeRule, Comment, XlsSplit, None }`) | 항목 추가 → `{ CodeRule, Comment, XlsSplit, CppRule, None }` |
 | 2 | `MainWindow.xaml.cs` `CurrentMode()` | 새 탭 `TabItem` 을 그 enum 값에 매핑 (`if (ReferenceEquals(selected, CppRuleTab)) return ActiveMode.CppRule;`) |
-| 3 | `MainWindow.xaml` | `RulesTabs` 안에 `<TabItem x:Name="CppRuleTab" AutomationProperties.AutomationId="CppRuleTab" Header="C/C++ 코드 규칙">` + 규칙 체크박스들. **AutomationId 를 반드시 줄 것** — UIA 하네스가 그걸로 찾는다 |
+| 3 | `MainWindow.xaml` | `RulesTabs` 안에 `<TabItem x:Name="CppRuleTab" AutomationProperties.AutomationId="CppRuleTab" Header="C/C++ 코드 규칙">` + 규칙 체크박스들. **AutomationId 를 반드시 줄 것** — UIA 하네스가 그걸로 찾는다([부록](#부록-ui-요소를-추가할-때의-automationid-규약)) |
 | 4 | `MainWindow.xaml.cs` `BuildJobs()` | `runCppRule` 분기 + `CollectRules(...)` + `jobs.Add(new RunnerJob("C/C++ 코드 규칙 수정", Path.Combine(_toolsDir, "_internal", "SparrowCppFix", "Run-SparrowCppFix.ps1"), rules, logDir))`. 공통 인자 루프(`-Solution`/`-Rules`/`-LogDir`/`-FilesFrom`/`-Commit`\|`-NoCommit`)는 이미 모든 job 에 적용되므로 손댈 필요 없다 |
 | 5 | `MainWindow.xaml.cs` `UpdateRunButtonForMode()` / `UpdateSummary()` / `RulesTabs_SelectionChanged()` / `SectionTabs_SelectionChanged()` | 새 갈래의 실행 버튼 라벨(`"C/C++ 코드 규칙 수정 실행"`), 요약바 문구, 탭 전환 시 규칙 설명 초기화 분기 |
 | 6 | `tools/publish-airgap.ps1` | `$projects` 배열에 새 엔진 추가(현재 4종 → 5종). 반입 체크리스트 출력도 자동으로 늘어난다 |
@@ -294,6 +296,16 @@ C# 러너에 `.cpp` 가 넘어간다. 갈래별로 확장자 집합을 갈라 �
 | **8** | `MainWindow.xaml` 의 **경고 배너** | `SectionFixTab` 바로 안, `Grid.Row="0"` 의 주황 `Border` — **`RulesTabs` 바깥**이다. 즉 새 C/C++ 하위 탭을 골라도 **그대로 떠 있다.** 문구가 *"Roslyn C# 파서로 코드를 재작성하므로 C/C++ 등 다른 언어에는 쓸 수 없습니다. C/C++ 결과는 위의 [XLS 분리] 대분류를 사용하세요."* 라서, 고치지 않으면 **제품이 사용자에게 거짓말을 한다.** 선택한 하위 탭에 따라 문구를 바꾸거나 배너를 `RulesTabs` 안으로 옮긴다 |
 | **9** | `MainWindow.xaml.cs` `UpdateSummary()` 의 **`SectionHintText`** | 삼항의 **else 쪽**에 `"코드 자동수정: C# 전용입니다. …"` 가 묻혀 있다. `switch (mode)` 케이스만 추가하고 이 줄을 지나치기 매우 쉽다 — 새 갈래에서도 "C# 전용" 이 그대로 뜬다 |
 | **10** | `MainWindow.xaml.cs` `BrowseFolderButton_Click` 의 **폴더 대화상자** | 대상 선택은 **폴더 하나**뿐이다(예전의 `[파일 선택]` 은 제거 — `.sln` 을 골라도 부모 폴더로 환원돼 결과가 같았다). 새 언어를 붙일 때 **여기서 손댈 것은 없다** — 폴더 기준이라 언어 무관이다. 확장자 집합은 아래 §2.2.2 의 열거 지점에서 넓힌다 |
+
+**git 게이트는 접점이 아니다 — 배선 없이 새 갈래에도 그대로 적용된다.** 판정(`FindGitRepositoryRoot`)은 언어가 아니라
+**대상 루트**만 보고, 잠금 대상도 `CommitCheck` 하나다(`UpdateGitState` → `UpdateRunButtonForMode` 의
+`CommitCheck.IsEnabled = commitApplies && _cts == null && !_commitBlockedByGit`, 여기서 `commitApplies = !IsXlsSection()`).
+즉 [XLS 분리]가 아닌 새 자동수정 갈래라면 커밋 옵션 잠금·안내 배너·[git 저장소 만들기]가 자동으로 따라온다.
+**다만 `RunButton.IsEnabled` 는 이 값을 보지 않는다** — git 이 없어도 실행은 막지 않는 것이 의도된 동작이므로
+(사내 SVN 사용처 배려) 새 갈래에서도 그 성질을 깨지 말 것. 대신 **러너 쪽 게이트는 새 러너가 직접 구현해야 한다**
+([2.2.1](#221-필수-러너의-cs-하드코딩-4곳) 과 같은 이유로 베낀 코드를 그대로 두면 안 되는 자리다):
+`-Commit` 인데 대상 루트가 저장소가 아니면 규칙 실행 **전에** 사유를 알리고 커밋만 건너뛴다
+([usage.md](usage.md#git-이-없는-폴더를-대상으로-잡으면)).
 
 여기에 더해:
 
@@ -385,6 +397,7 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 - [ ] 규칙별 실행 + `-LogDir` 에 타임스탬프 로그 (**`-LogDir` 폴더를 스스로 만든다** — 없으면 죽는 함정 제거)
 - [ ] **`.cs` 하드코딩 4곳을 새 언어 확장자로 교체**([2.2.1](#221-필수-러너의-cs-하드코딩-4곳)) — pathspec 생성 / `git status --porcelain` / `git checkout` / `git add`
 - [ ] `-Commit` 시 규칙별 커밋(선택 파일만: `--only --pathspec-from-file`) + `-VerifyCmd` 게이트
+- [ ] **git 게이트**: `-Commit` 인데 대상 루트가 저장소가 아니면 규칙 실행 **전에** 사유를 알리고 커밋만 건너뛴다(파일 수정은 진행) — 기존 러너의 `1b-2` 블록. 안 베끼면 옛 오진("git 락 재시도 실패")과 git usage 도움말 유출이 되살아난다
 
 **GUI**
 
@@ -397,7 +410,7 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 - [ ] `InitializeRuleInfo()` 에 새 규칙 설명 + `UpdateSummary()` 의 `CountChecked` 목록
 - [ ] **경고 배너 문구**(2.3 의 8) — 새 탭 위에서 "C/C++ 에는 쓸 수 없습니다" 가 뜨지 않는다
 - [ ] **`SectionHintText`**(2.3 의 9) — "코드 자동수정: C# 전용입니다" 가 새 갈래에서 안 뜬다
-- [ ] **파일 대화상자 필터**(2.3 의 10) — `.vcxproj` 를 고를 수 있다
+- [ ] **대상 선택**(2.3 의 10) — **손댈 것이 없음을 확인**했다. 버튼은 [폴더 선택]/[새로고침] 둘뿐이고 폴더 기준이라 언어 무관이다(확장자는 [2.2.2](#222-소스-파일-확장자는-러너가-아니라-엔진gui-에-있다) 에서 넓힌다)
 
 **배포·테스트·문서**
 
@@ -407,4 +420,56 @@ C/C++ 을 넣으면 그 라벨이 거짓이 된다. 두 선택지가 있고, **�
 - [ ] `README.md` 세 갈래 표 + 언어 지원 절 갱신, `docs/usage.md` 화면 구성 표 갱신
 - [ ] 새 엔진 폴더에 `README.md`(규칙 표 · CLI · 안전성 보장 · 잔여 위험)
 - [ ] **[XLS 분리] 는 건드리지 않았다**
+- [ ] 새 UI 요소에 **AutomationId** 를 줬다([부록](#부록-ui-요소를-추가할-때의-automationid-규약))
 - [ ] `./validate.ps1 -All` 통과
+
+---
+
+## 부록: UI 요소를 추가할 때의 AutomationId 규약
+
+이 GUI 는 설치되지 않는 커스텀 exe 라 **외부 스크린샷/자동화 도구를 붙일 수 없다.** 그래서 회귀 검증은
+UIA 하네스(`tests/gui-uia-tests.ps1`)가 **AutomationId 로 요소를 찾아** 단정하는 방식뿐이다
+(`AutomationElement.AutomationIdProperty` 조건 → `FindFirst`). **id 가 없거나 바뀌면 그 요소는 테스트에서 사라진다** —
+그것도 "실패"가 아니라 "요소 없음"으로 조용히 지나갈 수 있다.
+
+### 규칙
+
+1. **UIA 가 만져야 하는 요소에는 `AutomationProperties.AutomationId` 를 명시한다.** 입력칸(`TargetPathBox`)·
+   트리(`ScopeTree`)·탭(`CodeRuleTab`)·실행 버튼(`RunButton`)·체크박스(`CommitCheck`)·상태 텍스트(`StatusText`)가
+   여기 해당한다.
+2. **id 이름은 `x:Name` 과 같게 쓴다.** 이 레포에서 명시된 id 는 예외 없이 그 요소의 `x:Name` 과 같아서
+   XAML 을 읽는 사람이 둘을 따로 외울 필요가 없다(템플릿 안의 `scopeNodeCheck`·`assignCheckerKey`·`assignCombo`
+   만 `x:Name` 없이 id 만 있다 — 5번 참조).
+   WPF 는 `AutomationId` 가 비어 있으면 `x:Name` 을 대신 노출하므로 `x:Name` 만 준 요소도 트리에는 그 이름으로 뜨지만,
+   그래도 **명시를 권장**한다 — 폴백에 기대면 `x:Name` 을 리팩터링할 때 테스트가 조용히 끊긴다.
+3. **id 를 바꾸면 `tests/gui-uia-tests.ps1` 을 같은 커밋에서 고친다.** id 는 사용자에게 안 보이는 내부 식별자지만
+   테스트에게는 공개 API 다.
+4. **id 문자열을 화면 텍스트로 노출하지 않는다.** 하네스가 `CodeRuleTab`/`CommentTab` 같은 내부 식별자가
+   화면 텍스트에 새어 나오지 않는지를 별도로 단정한다(`U)` 체크).
+5. **ItemTemplate 안의 요소는 소문자 카멜로 구분한다** — 인스턴스가 여럿이라 "하나를 가리키는 이름"이 아니기 때문이다
+   (`scopeNodeCheck`, `assignCheckerKey`, `assignCombo`).
+
+### 지금 있는 id (실제 XAML 에서 확인한 것)
+
+`tools/SparrowRunner.Gui/MainWindow.xaml`
+
+| 구역 | AutomationId |
+| --- | --- |
+| 대분류/안내 | `SectionTabs` · `SectionFixTab` · `SectionXlsTab` · `SectionHintText` |
+| 대상·범위(코드 자동수정) | `TargetPathBox` · `ScopeTree` · `ScopeStatusText` · `scopeNodeCheck`(범위 트리 노드 체크박스, 템플릿) |
+| git 게이트 | `InitGitButton` |
+| 규칙 탭 | `RulesTabs` · `CodeRuleTab` · `CommentTab` |
+| XLS 분리 | `XlsPathBox` · `XlsOutputPathBox` · `XlsScopeTree` · `XlsScopeSummary` · `XlsScopeCommonPath` · `SelectAllXlsScopeButton` · `ClearXlsScopeButton` · `CheckerMappingSummary` · `OpenRuleManagerButton` |
+| 실행 줄(공유) | `RunButton` · `CommitCheck` · `StatusText` |
+
+`tools/SparrowRunner.Gui/RuleManagerWindow.xaml`
+
+| 구역 | AutomationId |
+| --- | --- |
+| 규칙 라이브러리 | `RuleList` · `RuleNewButton` · `RuleDeleteButton` · `RuleNameBox` · `RuleEditor` · `RuleSaveButton` |
+| 체커 매핑 | `AssignList` · `AssignStatusText` · `AssignEmptyText` · `AssignSaveButton` · `assignCheckerKey`(행, 템플릿) · `assignCombo`(행, 템플릿) |
+
+> **id 가 없는 요소도 있다.** `BrowseFolderButton` · `RefreshScopeButton` · `SelectAllScopeButton` ·
+> `ClearScopeButton` · `StopButton` · `OpenTargetButton` · `OpenXlsOutputButton` · `ClearLogButton` ·
+> `LogBox` · `GitNoticeBox` · `GitNoticeText` 와 규칙 체크박스들(`AS*`/`B*`)은 `x:Name` 만 있고,
+> 위 2번의 폴백으로 트리에 뜬다. **새로 추가하는 요소는 이쪽을 따르지 말고 1번을 따를 것.**
