@@ -1,5 +1,5 @@
 // Fixture harness for SparrowSyntaxFix. Every case below is grounded in REAL Sparrow output (see the task
-// brief / HANDOFF): the nullcast cases are actual `<Type> x = null;` findings; the parens cases are actual
+// brief / docs): the nullcast cases are actual `<Type> x = null;` findings; the parens cases are actual
 // &&/|| conditions the MISSING_PARENTHESIS_IN_EXPRESSION checker flagged. Each case wraps the snippet in a
 // method so it parses as a real LocalDeclarationStatement / if-condition, and asserts the FULL transformed
 // text (which also proves nothing else in the file moved). Exit code: 0 = all pass, 1 = any failure.

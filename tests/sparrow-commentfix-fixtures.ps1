@@ -52,7 +52,7 @@ function Read-Text {
 function Invoke-Tool {
     param([string[]]$ToolArgs)
     # EAP=Continue locally: a run that fails on purpose (exit 2) writes to stderr, and native stderr under
-    # EAP=Stop with 2>&1 becomes a terminating error (see HANDOFF). We want the exit code, not a throw.
+    # EAP=Stop with 2>&1 becomes a terminating error (see docs/architecture.md). We want the exit code, not a throw.
     $prev = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try { & $dotnet.Source run --project $toolProj -c Release --no-build -- @ToolArgs 2>&1 | Out-Null }

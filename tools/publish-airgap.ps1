@@ -2,7 +2,7 @@
 <#
     publish-airgap.ps1 — 폐쇄망(오프라인/air-gapped) 반입 번들 빌더.
 
-    인터넷 + .NET SDK가 있는 PC에서 한 번 실행해, sparrow-static-analysis 도구 4종을 미리 발행(publish)한다.
+    인터넷 + .NET SDK가 있는 PC에서 한 번 실행해, sparrow-toolkit 도구 4종을 미리 발행(publish)한다.
     발행 산출물을 skill 폴더째 폐쇄망 PC로 복사하면, 대상 PC에 .NET SDK나 NuGet 복원 없이도
     GUI/러너가 그대로 돈다(= `dotnet run`/`dotnet build`가 필요 없어짐).
 
@@ -59,7 +59,7 @@ $projects = @(
 
 $modeText = if ($selfContained) { "self-contained ($Runtime, 런타임 동봉 - 대상 PC 무설치)" } else { "framework-dependent ($Runtime, 대상 PC에 .NET 8 런타임 필요)" }
 
-Write-Host "==================== sparrow-static-analysis 폐쇄망 반입 발행 ===================="
+Write-Host "==================== sparrow-toolkit 폐쇄망 반입 발행 ===================="
 Write-Host "모드      : $modeText"
 Write-Host "발행 대상 : $($projects.Count)개 프로젝트"
 Write-Host ""
@@ -158,7 +158,7 @@ if ($failed.Count -gt 0) {
 
 # --- 반입 체크리스트(성공 시) ---
 Write-Host "==================== 폐쇄망 반입 체크리스트 ===================="
-Write-Host "1) 복사할 것: skills\sparrow-static-analysis 폴더 트리 전체"
+Write-Host "1) 복사할 것: 이 레포(sparrow-toolkit) 폴더 트리 전체"
 Write-Host ("   - 방금 생성된 publish\ 산출물 {0}곳:" -f $projects.Count)
 foreach ($p in $projects) { Write-Host ("       {0}" -f $p.OutDir) }
 Write-Host "   - (선행 문서 불필요: Track C 익스포터는 Sparrow xls 하나만 입력으로 받습니다)"

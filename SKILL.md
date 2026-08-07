@@ -1,5 +1,5 @@
 ---
-name: sparrow-static-analysis
+name: sparrow-toolkit
 description: Use when handling Sparrow static-analysis XLS findings, including deterministic Roslyn CLI fixes for C# coding/comment rules and splitting the remaining findings (any language) into per-checker Markdown files for LLM/human review.
 ---
 
