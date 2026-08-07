@@ -1516,7 +1516,7 @@ namespace SparrowRunner.Gui
                 return fallback;
             }
 
-            throw new DirectoryNotFoundException("sparrow-toolkit 루트를 찾을 수 없습니다(레포 루트의 SKILL.md + tools\Run-SparrowRunnerGui.cmd 로 판별합니다).");
+            throw new DirectoryNotFoundException(@"sparrow-toolkit 루트를 찾을 수 없습니다(레포 루트의 SKILL.md + tools\Run-SparrowRunnerGui.cmd 로 판별합니다).");
         }
 
         private void SetRunning(bool running)
