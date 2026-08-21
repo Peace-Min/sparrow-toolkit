@@ -1,0 +1,48 @@
+LLVM/Clang redistribution notice for Sparrow Helper
+===================================================
+
+Bundled components
+------------------
+
+- LLVM/Clang version: 20.1.0
+- clang.exe
+- clang-format.exe
+- Clang 20 built-in resource headers (`lib/clang/20/include`)
+- Upstream project: https://llvm.org/
+- Release source: https://github.com/llvm/llvm-project/tree/llvmorg-20.1.0
+- License: Apache License 2.0 with LLVM Exceptions
+- SPDX identifier: Apache-2.0 WITH LLVM-exception
+
+Copyright
+---------
+
+Copyright LLVM Project contributors.
+
+The LLVM Project does not endorse Sparrow Helper. LLVM and Clang names are used
+only to identify the bundled analysis and formatting components.
+
+Binary verification for the Windows x64 LLVM 20.1.0 installation used by this
+distribution:
+
+F9BD9C90FE5AFEA4929721D80700BD989B9852D1E18D341ADCE8992A71C2F31E  clang.exe
+B2DA772E065439062A23BA51AB3A34510803FA0196A1DC871DD32280699A55DF  clang-format.exe
+
+The complete LLVM license is provided in LLVM-LICENSE.txt. If the bundled LLVM
+package is changed or upgraded, its version, hashes, license files, and any
+additional third-party notices must be reviewed and updated before distribution.
+
+Clang resource header notices
+-----------------------------
+
+The resource headers are copied unchanged from the official LLVM installation,
+including their in-file copyright and license notices.  Most headers use
+Apache-2.0 WITH LLVM-exception.  The LLVM 20.1.0 Windows package also contains
+headers with embedded permissive MIT-style terms, including arm_fp16.h,
+arm_neon.h, selected AVX/keylocker intrinsic headers, and cuda_wrappers headers.
+Those in-file terms remain applicable and are not replaced by this summary.
+
+Generated or small wrapper headers without an individual SPDX marker are kept
+with the unmodified official resource-header set and the complete upstream LLVM
+license above.  A public binary release must retain this directory unchanged and
+review the exact upstream package's complete third-party notices; this project
+notice alone is not a substitute for that upstream audit.

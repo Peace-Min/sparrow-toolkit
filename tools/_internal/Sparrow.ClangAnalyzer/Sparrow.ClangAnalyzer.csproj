@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Sparrow.ClangAnalyzer</AssemblyName>
+    <RootNamespace>Sparrow.ClangAnalyzer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SparrowClang.Protocol\SparrowClang.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

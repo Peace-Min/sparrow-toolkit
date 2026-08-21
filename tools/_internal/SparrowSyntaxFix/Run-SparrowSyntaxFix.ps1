@@ -89,7 +89,6 @@ if (-not $Solution) { throw "경로가 비었습니다. 솔루션(.sln) 또는 �
 
 # 규칙 -> 커밋 라벨 (검수 가능한 단위로 규칙별 커밋)
 $labels = [ordered]@{
-    nullcast              = '검토필요: 명시 지역변수 typed null 초기화 (SparrowSyntaxFix)'
     nullvar               = '검토필요: 명시 지역변수 typed null 초기화 (SparrowSyntaxFix)'
     parens                = '괄호 명확화 일괄 (&&/|| 피연산자) (SparrowSyntaxFix)'
     'objectvar-safe'      = '객체 생성 명시 타입 var 변환 일괄 (SparrowSyntaxFix)'
@@ -100,9 +99,9 @@ $labels = [ordered]@{
     objectinitializer     = '검토필요: 연속 대입 object initializer 통합 (SparrowSyntaxFix)'
     'arrayvar-safe'       = '배열 선언 문법 간소화 일괄 (SparrowSyntaxFix)'
     'arrayvar-narrowing'  = '검토필요: 배열 정적 타입 축소 var 변환 (SparrowSyntaxFix)'
-    forvar                = 'for 초기화절 명시 타입 var 변환 (SparrowSyntaxFix)'
-    fieldsplit            = '다중 선언자 필드 줄분리 (SparrowSyntaxFix)'
-    emptystmt             = '잉여 빈문장(; ;) 제거 (SparrowSyntaxFix)'
+    forvar                = '검토필요: for 초기화절 명시 타입 var 변환 (SparrowSyntaxFix)'
+    fieldsplit            = '검토필요: 다중 선언자 필드 줄분리 (SparrowSyntaxFix)'
+    emptystmt             = '검토필요: 잉여 빈문장(; ;) 제거 (SparrowSyntaxFix)'
     forhoist              = '검토필요: 다중 선언자 for 초기화절 hoist 분해 (SparrowSyntaxFix)'
 }
 
@@ -131,18 +130,42 @@ if (-not $rulesExplicit -and [Environment]::UserInteractive) {
     }
 }
 
-$canonicalRules = @('nullvar', 'nullcast', 'parens', 'objectvar-safe', 'foreachcast', 'obviousvar', 'objectvar-narrowing', 'localconst', 'objectinitializer', 'arrayvar-safe', 'arrayvar-narrowing', 'forvar', 'fieldsplit', 'emptystmt', 'forhoist')
+$ruleAliases = @{ nullcast = 'nullvar' }
+$canonicalRules = @('nullvar', 'parens', 'objectvar-safe', 'foreachcast', 'obviousvar', 'objectvar-narrowing', 'localconst', 'objectinitializer', 'arrayvar-safe', 'arrayvar-narrowing', 'forvar', 'fieldsplit', 'emptystmt', 'forhoist')
+$acceptedRules = @($canonicalRules + $ruleAliases.Keys)
 $Rules = @($Rules | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$invalidRules = @($Rules | Where-Object { $canonicalRules -notcontains $_ })
+$invalidRules = @($Rules | Where-Object { $acceptedRules -notcontains $_ })
 if ($invalidRules.Count -gt 0) {
-    throw "지원하지 않는 규칙: $($invalidRules -join ', ') / 허용: $($canonicalRules -join ', ')"
+    throw "지원하지 않는 규칙: $($invalidRules -join ', ') / 허용: $($acceptedRules -join ', ')"
 }
+$normalizedRules = New-Object System.Collections.Generic.List[string]
+foreach ($rule in $Rules) {
+    $lower = $rule.ToLowerInvariant()
+    $canonical = if ($ruleAliases.ContainsKey($lower)) { $ruleAliases[$lower] } else { $lower }
+    if (-not $normalizedRules.Contains($canonical)) { [void]$normalizedRules.Add($canonical) }
+}
+$Rules = @($normalizedRules.ToArray())
 
 # 0) preflight
 if (-not (Test-Path -LiteralPath $Solution)) { throw "솔루션/경로 없음: $Solution" }
 $slnFull = (Resolve-Path -LiteralPath $Solution).Path
 # .sln 파일이면 그 폴더, 폴더면 그대로 = 소스 루트(툴이 .cs 재귀 + 생성/백업 제외)
 $root = if (Test-Path -LiteralPath $slnFull -PathType Leaf) { Split-Path -Parent $slnFull } else { $slnFull }
+
+function Test-GitRepository {
+    param([Parameter(Mandatory)][string]$Root)
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return $false }
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& git -C $Root rev-parse --is-inside-work-tree 2>$null)
+        $code = $LASTEXITCODE
+        return (($code -eq 0) -and ((($output -join '')).Trim() -eq 'true'))
+    }
+    finally { $ErrorActionPreference = $previousPreference }
+}
+$gitAvailable = [bool](Get-Command git -ErrorAction SilentlyContinue)
+$isGitRepo = Test-GitRepository -Root $root
 
 # 실행 로그
 if (-not $LogDir) { $LogDir = (Get-Location).Path }
@@ -206,21 +229,15 @@ Write-Host "툴            : $($tool.path)"
 
 # 작업트리 오염 경고(자동수정 diff 격리를 위해). native(git) stderr가 EAP=Stop에서 throw되는 것을 막기
 # 위해 이 구간만 Continue. git 없음/비-git 폴더(exit!=0)면 조용히 건너뜀(경고는 편의 기능일 뿐).
-if (-not $DryRun) {
+if (-not $DryRun -and $isGitRepo) {
     $ErrorActionPreference = 'Continue'
     $dirty = @(& git -C $root status --porcelain 2>$null)
-    $gitCode = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
-    if ($gitCode -eq 0) {
-        # 커밋마다 git 자동 gc(재패킹)가 .git pack의 .idx를 unlink하려다 백신/인덱서와 충돌해
-        # "Unlink of file ...pack-*.idx failed. Should I try again?" 가 나는 것을 원천 차단.
-        # 대상 repo 로컬 설정(1회), 다른 repo엔 영향 없음.
-        & git -C $root config gc.auto 0 2>&1 | Out-Null
-        & git -C $root config gc.autoDetach false 2>&1 | Out-Null
-        & git -C $root config core.fscache true 2>&1 | Out-Null
-        if ($dirty.Count -gt 0) {
-            Write-Warning "작업트리에 미커밋 변경이 있습니다($($dirty.Count)개). 자동수정 diff와 섞일 수 있으니 깨끗한 상태에서 권장."
-        }
+    & git -C $root config gc.auto 0 2>&1 | Out-Null
+    & git -C $root config gc.autoDetach false 2>&1 | Out-Null
+    & git -C $root config core.fscache true 2>&1 | Out-Null
+    if ($dirty.Count -gt 0) {
+        Write-Warning "작업트리에 미커밋 변경이 있습니다($($dirty.Count)개). 자동수정 diff와 섞일 수 있으니 깨끗한 상태에서 권장."
     }
 }
 
@@ -405,6 +422,20 @@ elseif ($NoCommit) {
     Write-Host "-> 파일만 수정(커밋 안 함). (-NoCommit)"
 }
 
+$commitSkipReason = $null
+if ($Commit -and -not $isGitRepo) {
+    $commitSkipReason = if ($gitAvailable) {
+        "대상 루트가 git 저장소가 아닙니다: $root"
+    }
+    else {
+        "git이 설치되어 있지 않거나 PATH에 없습니다: $root"
+    }
+    $Commit = $false
+    Write-Warning "커밋하지 않습니다 - $commitSkipReason"
+    Write-Host "파일 수정은 계속 진행합니다."
+    Add-Content -LiteralPath $logPath -Value "[GIT] commit skipped: $commitSkipReason"
+}
+
 # 1c) 컴파일 게이트 안내. -Commit인데 -VerifyCmd가 없으면 게이트가 없다는 걸 분명히 알린다(커밋 후 전체 빌드 필수).
 $gateActive = ($Commit -and $VerifyCmd)
 if ($Commit -and -not $VerifyCmd) {
@@ -484,6 +515,7 @@ foreach ($r in $Rules) {
             'failed'    { Write-Warning "  커밋 실패(git 락 5회 재시도 후에도) - 파일 수정은 유지됨. 나중에 수동 커밋 가능." }
         }
     }
+    elseif ($commitSkipReason) { Write-Host "  커밋      : 건너뜀 - $commitSkipReason" }
     elseif ($NoCommit) { Write-Host "  커밋      : -NoCommit -> 커밋 안 함 (파일만 수정됨)" }
     else { Write-Host "  커밋      : -Commit 미지정 -> 커밋 안 함 (파일만 수정됨)" }
     if ($backupDir) { Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue }
@@ -491,6 +523,7 @@ foreach ($r in $Rules) {
 
 Write-Host ""
 if (-not $DryRun) { Write-Host "총 수정 건수(적용된 규칙 합): $grand" }
+if ($commitSkipReason) { Write-Host "커밋: 하지 않음 - $commitSkipReason" }
 if ($gateActive -and $gateReverted -gt 0) { Write-Host "게이트 revert(검증 실패로 되돌리고 커밋 skip한 규칙): $gateReverted" }
 if ($failed) { Write-Host "일부 규칙 미완 -> 로그 확인." }
 Write-Host "전체 로그: $logPath"

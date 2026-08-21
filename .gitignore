@@ -3,6 +3,7 @@ tools/**/bin/
 tools/**/obj/
 # publish/ = 폐쇄망 반입용 self-contained/framework-dependent 발행 산출물(publish-airgap.ps1). 머신마다 생성, 커밋 금지.
 tools/**/publish/
+tools/**/publish-*/
 SparrowRunner.Gui/**/bin/
 SparrowRunner.Gui/**/obj/
 SparrowRunner.Gui/**/publish/
@@ -40,3 +41,11 @@ references/sparrow-official-rules/
 # Track C 익스포터는 선행 문서를 요구하지 않는다. 체커별 가이드는 각자 필요한 만큼
 # 로컬로 쌓는 자산이라 레포가 배포하지 않는다.
 references/checkers/
+
+# --- LLVM/Clang source-control boundary ---
+# Offline publishing copies official LLVM binaries/headers from the local LLVM installation.
+# Only the reviewed policy/license documents belong in Git; never vendor the runtime here.
+tools/third_party/llvm/*
+!tools/third_party/llvm/README.md
+!tools/third_party/llvm/LLVM-LICENSE.txt
+!tools/third_party/llvm/THIRD-PARTY-NOTICES.txt

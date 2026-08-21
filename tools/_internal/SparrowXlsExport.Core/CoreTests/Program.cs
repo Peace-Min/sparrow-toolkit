@@ -4,6 +4,7 @@
 //   L. Output layout: <OutDir>\<체커 키>\{ID}_{파일명}_{라인}.md and NOTHING else (no index/summary files).
 //   F. --files-from source scope filter (absolute / dir+file / relative / unique-basename).
 //   G. Cross-PC relative-tail scope match + [범위 불일치] / [범위 경고] diagnostics.
+//   R. Run-report output-tree guard: a report path inside OutDir is refused.
 //   A. Console parse (optional real xls) exits 0 and writes checker folders.
 //   B. Core.Run == console parse: byte-identical output tree.
 //
@@ -82,6 +83,9 @@ internal static class Program
 
             Console.WriteLine("\n==== G. Cross-PC relative-tail scope match + diagnostics ====");
             TestCrossPcScopeFilter(work);
+
+            Console.WriteLine("\n==== R. 실행 리포트 출력-트리 가드 ====");
+            TestReportOutputTreeGuard(work);
 
             // A/B compare the Core against the console exe on a real xls; fixtures-only mode stops here.
             if (fixturesOnly) return Done();
@@ -905,6 +909,39 @@ internal static class Program
             if (!FilesByteIdentical(Path.Combine(a, na[i]), Path.Combine(b, nb[i]), out string d)) { diff = d; return false; }
         }
         diff = ""; return true;
+    }
+
+    private static void TestReportOutputTreeGuard(string work)
+    {
+        string outDir = Path.Combine(work, "r-out");
+        Directory.CreateDirectory(outDir);
+        var report = new TrackCRunReport { OutDir = outDir };
+
+        string inside = Path.Combine(outDir, "run-report.json");
+        Check(!TrackCReportWriter.TryWrite(inside, report, out string? errInside),
+              "R: 출력 폴더 안 리포트 경로는 거부");
+        Check(errInside != null && errInside.Contains("report=", StringComparison.Ordinal)
+                                && errInside.Contains("out=", StringComparison.Ordinal),
+              "R: 거부 사유에 report/out 실제 경로가 담긴다", errInside ?? "(null)");
+        Check(!File.Exists(inside) && !File.Exists(TrackCReportWriter.CompanionLogPath(inside)),
+              "R: 거부 시 json과 동반 log를 만들지 않는다");
+
+        string deep = Path.Combine(outDir, "logs", "run-report.json");
+        Check(!TrackCReportWriter.TryWrite(deep, report, out _), "R: 출력 폴더 하위 경로도 거부");
+        Check(!Directory.Exists(Path.Combine(outDir, "logs")),
+              "R: 거부 시 출력 폴더 밑에 폴더도 만들지 않는다");
+
+        Check(!TrackCReportWriter.TryWrite(outDir, report, out _), "R: 출력 폴더 경로 자체도 거부");
+        Check(Directory.GetFileSystemEntries(outDir).Length == 0,
+              "R: 반복 거부 후에도 출력 폴더는 비어 있다");
+
+        string sibling = Path.Combine(work, "r-out-logs", "run-report.json");
+        Check(TrackCReportWriter.TryWrite(sibling, report, out string? errSibling),
+              "R: 접두만 같은 형제 폴더에는 정상 기록", errSibling ?? "");
+        Check(File.Exists(sibling) && File.Exists(TrackCReportWriter.CompanionLogPath(sibling)),
+              "R: 정상 경로에는 json과 동반 log를 기록");
+        Check(Directory.GetFileSystemEntries(outDir).Length == 0,
+              "R: 형제 폴더 기록 후에도 출력 폴더는 비어 있다");
     }
 
     private static List<string> RelativeFiles(string root)

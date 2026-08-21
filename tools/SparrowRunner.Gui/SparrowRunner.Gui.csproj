@@ -11,7 +11,55 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\_internal\SparrowCFamilySyntaxFix\SparrowCFamilySyntaxFix.csproj" />
+    <ProjectReference Include="..\_internal\SparrowCFamilyCommentFix\SparrowCFamilyCommentFix.csproj" />
+    <ProjectReference Include="..\_internal\SparrowCFamilyPipeline\SparrowCFamilyPipeline.csproj" />
     <ProjectReference Include="..\_internal\SparrowXlsExport.Core\SparrowXlsExport.Core.csproj" />
+    <ProjectReference Include="..\_internal\Sparrow.ClangAnalyzer\Sparrow.ClangAnalyzer.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <ClangAnalyzerOutputDir>$(MSBuildProjectDirectory)\..\_internal\Sparrow.ClangAnalyzer\bin\$(Configuration)\net8.0</ClangAnalyzerOutputDir>
+    <BundledLlvmDir>$(MSBuildProjectDirectory)\..\third_party\llvm</BundledLlvmDir>
+    <InstalledClangDir>$(ProgramFiles)\LLVM\bin</InstalledClangDir>
+  </PropertyGroup>
+
+  <Target Name="CopyClangAnalyzerForBuild" AfterTargets="Build">
+    <ItemGroup>
+      <_ClangAnalyzerBuildFiles Include="$(ClangAnalyzerOutputDir)\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)clang-analyzer" />
+    <Copy SourceFiles="@(_ClangAnalyzerBuildFiles)"
+          DestinationFolder="$(OutDir)clang-analyzer"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishClangRuntime" AfterTargets="Publish">
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\_internal\Sparrow.ClangAnalyzer\Sparrow.ClangAnalyzer.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(PublishDir)clang-analyzer\;RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishSingleFile=false;NuGetAudit=false"
+             BuildInParallel="false" />
+    <ItemGroup>
+      <_ClangResourceHeaders Include="$(ProgramFiles)\LLVM\lib\clang\20\include\**\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)clang;$(PublishDir)licenses" />
+    <Copy Condition="Exists('$(InstalledClangDir)\clang.exe')"
+          SourceFiles="$(InstalledClangDir)\clang.exe"
+          DestinationFolder="$(PublishDir)clang"
+          SkipUnchangedFiles="true" />
+    <Copy Condition="Exists('$(InstalledClangDir)\clang-format.exe')"
+          SourceFiles="$(InstalledClangDir)\clang-format.exe"
+          DestinationFolder="$(PublishDir)clang"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_ClangResourceHeaders)"
+          DestinationFiles="@(_ClangResourceHeaders->'$(PublishDir)lib\clang\20\include\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(BundledLlvmDir)\LLVM-LICENSE.txt;$(BundledLlvmDir)\THIRD-PARTY-NOTICES.txt"
+          DestinationFolder="$(PublishDir)licenses"
+          SkipUnchangedFiles="true" />
+    <Warning Condition="!Exists('$(InstalledClangDir)\clang.exe')"
+             Text="clang.exe를 찾지 못했습니다. publish/clang에 공식 LLVM Clang 바이너리를 별도로 배치해야 합니다." />
+  </Target>
 
 </Project>

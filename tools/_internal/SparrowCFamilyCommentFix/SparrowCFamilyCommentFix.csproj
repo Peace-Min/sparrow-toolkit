@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowCFamilyCommentFix</AssemblyName>
+    <RootNamespace>SparrowCFamilyCommentFix</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SparrowCFamily.Core\SparrowCFamily.Core.csproj" />
+  </ItemGroup>
+
+</Project>

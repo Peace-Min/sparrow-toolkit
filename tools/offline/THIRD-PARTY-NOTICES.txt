@@ -1,0 +1,36 @@
+Sparrow Helper portable bundle - third-party notice
+====================================================
+
+This notice distinguishes Sparrow-authored MIT code from third-party components.
+It is not a substitute for the license files copied into this bundle.
+
+LLVM/Clang
+----------
+The private offline bundle contains an unmodified official LLVM/Clang 20.1.0
+runtime used as a separate process.  It is licensed under Apache-2.0 WITH
+LLVM-exception.  Clang resource headers retain their own in-file notices; some
+headers contain permissive MIT-style terms.  See the complete files under:
+
+  tools\SparrowRunner.Gui\publish\licenses
+
+NPOI 2.8.0
+----------
+NPOI is used to read XLS/XLSX workbooks without Microsoft Excel.  The source
+package is distributed under Apache-2.0, and version 2.8.0 also includes the
+Open Source Maintenance Fee license terms for binary use.  Those terms can
+apply to revenue-generating organizational use even when the bundle is private.
+Review the copied LICENSE and OSMFEULA files under licenses\nuget before use.
+
+GUI image assets
+----------------
+The GUI icons are original project-owned WPF vector geometry stored in XAML.
+No third-party or user-supplied PNG icon asset is included in the current source
+or portable bundle.  These vector drawings are covered by the repository MIT
+license together with the surrounding Sparrow-authored UI code.
+
+.NET and NuGet packages
+-----------------------
+The bundle includes the .NET 8 Windows Desktop runtime and managed/native NuGet
+dependencies.  License and notice files discovered in the restored NuGet
+packages are copied to licenses\nuget, with PACKAGE-MANIFEST.txt recording the
+package versions and declared license metadata.

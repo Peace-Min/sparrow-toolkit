@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowCFamily.Core</AssemblyName>
+    <RootNamespace>SparrowCFamily.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowCFamilyPipeline</AssemblyName>
+    <RootNamespace>SparrowCFamilyPipeline</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SparrowCFamily.Core\SparrowCFamily.Core.csproj" />
+    <ProjectReference Include="..\SparrowCFamilySyntaxFix\SparrowCFamilySyntaxFix.csproj" />
+    <ProjectReference Include="..\SparrowCFamilyCommentFix\SparrowCFamilyCommentFix.csproj" />
+    <ProjectReference Include="..\SparrowClang.Protocol\SparrowClang.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -255,6 +255,16 @@ namespace SparrowXlsExport.Core
             try
             {
                 string full = Path.GetFullPath(reportPath.Trim().Trim('"'));
+
+                // XLS 출력 트리에는 체커 폴더와 항목 md만 있어야 한다. 리포트 경로가
+                // 출력 폴더 자체이거나 그 하위라면 폴더를 만들기 전에 거부한다.
+                if (IsInsideOutputTree(full, report.OutDir, out string? outFull))
+                {
+                    error = "리포트 경로가 XLS 분리 출력 폴더 안입니다. 출력 폴더 밖 경로를 지정하세요. "
+                            + "report=" + full + " / out=" + outFull;
+                    return false;
+                }
+
                 string? dir = Path.GetDirectoryName(full);
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
@@ -274,6 +284,26 @@ namespace SparrowXlsExport.Core
                 error = ex.Message;
                 return false;
             }
+        }
+
+        /// <summary>리포트 경로가 XLS 출력 폴더 또는 그 하위인지 검사합니다.</summary>
+        public static bool IsInsideOutputTree(string reportFullPath, string? outDir, out string? outFullPath)
+        {
+            outFullPath = null;
+            if (string.IsNullOrWhiteSpace(outDir)) return false;
+
+            string outFull;
+            try { outFull = Path.GetFullPath(outDir.Trim().Trim('"')); }
+            catch { return false; }
+
+            outFull = outFull.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (outFull.Length == 0) return false;
+            outFullPath = outFull;
+
+            const StringComparison comparison = StringComparison.OrdinalIgnoreCase;
+            if (string.Equals(reportFullPath, outFull, comparison)) return true;
+            return reportFullPath.StartsWith(outFull + Path.DirectorySeparatorChar, comparison)
+                || reportFullPath.StartsWith(outFull + Path.AltDirectorySeparatorChar, comparison);
         }
 
         /// <summary>Path of the human summary that accompanies a json report ("&lt;stem&gt;.log").</summary>

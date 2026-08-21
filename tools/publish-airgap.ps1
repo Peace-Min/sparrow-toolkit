@@ -24,7 +24,11 @@
       .\publish-airgap.ps1 -FrameworkDependent   # 크기 축소(대상 PC에 .NET 8 런타임 필요)
       .\publish-airgap.ps1 -DryRun         # 무엇을 어디에 발행할지만 출력하고 종료(빌드 안 함)
 
+    한 번에 Portable 폴더/ZIP까지 만들려면 이 스크립트를 직접 실행하는 대신 다음을 사용한다:
+      .\build-offline-portable.ps1
+
     산출물(publish\)은 머신마다 생성되는 것이라 커밋하지 않는다(.gitignore 로 제외).
+    GUI 발행에는 별도 Clang AST 분석기, LLVM/Clang 20.1.0, 리소스 헤더와 라이선스 고지가 포함된다.
 #>
 param(
     [switch]$FrameworkDependent,
@@ -48,6 +52,26 @@ $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyI
 
 $selfContained = -not $FrameworkDependent
 $scMode = if ($selfContained) { 'true' } else { 'false' }
+
+$llvmRoot = Join-Path $env:ProgramFiles 'LLVM'
+$clangExe = Join-Path $llvmRoot 'bin\clang.exe'
+$clangFormatExe = Join-Path $llvmRoot 'bin\clang-format.exe'
+$clangResourceInclude = Join-Path $llvmRoot 'lib\clang\20\include'
+$expectedClangHash = 'F9BD9C90FE5AFEA4929721D80700BD989B9852D1E18D341ADCE8992A71C2F31E'
+$expectedClangFormatHash = 'B2DA772E065439062A23BA51AB3A34510803FA0196A1DC871DD32280699A55DF'
+
+function Assert-ApprovedLlvmBundle {
+    foreach ($required in @($clangExe, $clangFormatExe, $clangResourceInclude)) {
+        if (-not (Test-Path -LiteralPath $required)) {
+            throw "승인된 LLVM/Clang 20.1.0 구성요소가 없습니다: $required"
+        }
+    }
+    $clangHash = (Get-FileHash -LiteralPath $clangExe -Algorithm SHA256).Hash
+    $formatHash = (Get-FileHash -LiteralPath $clangFormatExe -Algorithm SHA256).Hash
+    if ($clangHash -ne $expectedClangHash -or $formatHash -ne $expectedClangFormatHash) {
+        throw "LLVM/Clang 바이너리가 승인된 20.1.0 해시와 다릅니다. tools\third_party\llvm 고지를 검토·갱신한 뒤 발행하세요."
+    }
+}
 
 # 발행 대상 4종. Exe = 발행 후 존재 확인용 실행 파일명(CLI는 러너 fallback 검증에 쓰임).
 $projects = @(
@@ -81,6 +105,7 @@ if ($DryRun) {
     $dn = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($dn) { Write-Host "dotnet    : 발견됨 ($($dn.Source))" }
     else { Write-Warning "dotnet    : 이 PC에서 dotnet SDK를 찾지 못했습니다. 실제 발행은 SDK가 있는 인터넷 PC에서 하세요." }
+    Write-Host ("LLVM/Clang: {0} (실제 발행 시 20.1.0 SHA-256 검증)" -f $clangExe)
     Write-Host ""
     Write-Host "[DryRun] 종료(exit 0). 실제 발행하려면 -DryRun 없이 다시 실행하세요."
     exit 0
@@ -92,6 +117,8 @@ if (-not $dotnet) {
     throw "dotnet SDK를 찾을 수 없습니다. 인터넷 + .NET 8 이상 SDK가 있는 PC에서 실행하세요(폐쇄망 대상 PC가 아니라 발행 PC에서)."
 }
 Write-Host "dotnet    : $($dotnet.Source)"
+Assert-ApprovedLlvmBundle
+Write-Host "LLVM/Clang: 20.1.0 승인 해시 확인 완료"
 Write-Host ""
 
 $results = @()
@@ -163,6 +190,7 @@ Write-Host ("   - 방금 생성된 publish\ 산출물 {0}곳:" -f $projects.Coun
 foreach ($p in $projects) { Write-Host ("       {0}" -f $p.OutDir) }
 Write-Host "   - (선행 문서 불필요: Track C 익스포터는 Sparrow xls 하나만 입력으로 받습니다)"
 Write-Host "   - tools\Run-SparrowRunnerGui.cmd, tools\Run-SparrowAll.cmd, tools\_internal\...\Run-*.ps1 (러너/진입점)"
+Write-Host "   - GUI publish\clang-analyzer, publish\clang, publish\lib\clang\20\include, publish\licenses"
 Write-Host ""
 if ($selfContained) {
     Write-Host "2) 대상 PC 런타임: 불필요. self-contained 발행이라 .NET SDK/런타임 설치가 필요 없습니다."

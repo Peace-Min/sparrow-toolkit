@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SparrowClang.Protocol</AssemblyName>
+    <RootNamespace>SparrowClang.Protocol</RootNamespace>
+  </PropertyGroup>
+
+</Project>
